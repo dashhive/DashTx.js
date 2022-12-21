@@ -1,0 +1,55 @@
+03 00 00 00 # version
+02 # number of inputs
+
+8888888877777777777777666666666666555555555544444444333333222211 txid
+0d 00 00 00 # vout (13)
+6a # size (106)
+47 # script sig size (71)
+30 44 # asn1 sequence + size (68)
+02 20 # asn1 byte type + size (32)
+232013ba40cbc3a6f2e0a3a6571aa318bed30bb13de200c13c9d9dac8725e633
+02 20 # asn1 byte type + size (32)
+72ec601c58e35235d5dd273cac467f1d0f4d15b7841b78a75d0903d56cc34b4c
+01 # ???
+21 # size (33)
+03 # ??? (pk quadrant? / compressed)
+755be68d084e7ead4d83e23fb37c3076b16ead432de1b0bdf249290400f263cb #pk
+ff ff ff ff # sequence
+
+5555666666666666777777777777778888888888888888999999999999999999
+1b 00 00 00
+6a
+47
+30 44
+02 20
+66d7860c09698c8366ea6be2f072c1b4b835621f6f42a2c5dcd48220a160edb4
+02 20
+7fee09efb55427ed9ec38c8d8eb0269cbc0de5f4a6433b6316ac0c36e60f50a2
+01
+21
+03
+0b4c499b4223a0089958daa43e58638ebe40864448a1b0fe2d9b40633df880a4
+ff ff ff ff # sequence
+
+02 # number of outputs
+
+b3 24 00 00 00 00 00 00 # satoshis
+# output script 1
+19 # script size (25)
+  76
+  a9
+  14 # (20)
+  1e0a6ef6085bb8af443a9e7f8941e61deb09fb54 # pay addr 1
+  88
+  ac
+b3 24 00 00 00 00 00 00 # satoshis
+# output script 2
+19
+  76
+  a9
+  14
+  5bcd0d776a7252310b9f1a7eee1a749d42126944
+  88
+  ac
+
+00 00 00 00 # lock time
