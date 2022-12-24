@@ -1,0 +1,40 @@
+# raw tx
+01 00 00 00 # version
+01 # num inputs
+a2bda7b7e967346fcf189cee2563b0846d7bec06bb6db6119054add1875bd377 # txid
+00 00 00 00 # prev vout index
+00 # sig script size
+ffffffff # sequence
+01 # num outputs
+    20 f1 61 0b 00 00 00 00 # satoshis
+    19 # varint size output pubkeyhash
+    76a9 # op codes
+    14 # size 20
+    f93af105187d21ed6adfa5d71bfada7d7324e53c # pubkeyhash
+    88ac # op codes
+00000000 # locktime
+
+# signed tx
+01 00 00 00
+01
+a2bda7b7e967346fcf189cee2563b0846d7bec06bb6db6119054add1875bd377
+00 00 00 00
+6a
+    47
+    3044
+    0220
+    528e92bc890b362efcab0ab1af0f9427d501909be59fe22dbdb4c26eac174181
+    0220
+    6eb9c83360ad46c9f17be32ea15a08d2765a934e08ce6f2578b3379bbfa03afd
+    01
+    21
+    024451fc7d9e271fab77265bd0292fc274ee231e7ecc076bf6269999c0cbbf9f90
+ffffffff
+01
+    20f1610b00000000
+    19
+    76a9
+    14
+    f93af105187d21ed6adfa5d71bfada7d7324e53c
+    88ac
+00000000
