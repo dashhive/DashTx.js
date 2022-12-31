@@ -200,26 +200,10 @@
         subscript = `${PKH_SCRIPT_SIZE}${OP_DUP}${OP_HASH160}${PKH_SIZE}${input.pubKeyHash}${OP_EQUALVERIFY}${OP_CHECKSIG}`;
       }
       return {
-        txId:
-          input.txId ??
-          //@ts-ignore
-          input.txid,
-        prevIndex:
-          input.prevIndex ??
-          //@ts-ignore
-          input.index ??
-          //@ts-ignore
-          input.vout,
-        pubKeyHash:
-          input.pubKeyHash ??
-          //@ts-ignore
-          input.pubkeyhash ??
-          //@ts-ignore
-          input.pubkeyHash,
-        sigHashType:
-          input.sigHashType ??
-          //@ts-ignore
-          input.sighashType,
+        txId: input.txId,
+        prevIndex: input.prevIndex,
+        pubKeyHash: input.pubKeyHash,
+        sigHashType: input.sigHashType,
         subscript: subscript,
       };
     });
