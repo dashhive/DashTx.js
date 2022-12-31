@@ -1,0 +1,40 @@
+{
+  "name": "@dashincubator/blocktx",
+  "version": "0.8.0",
+  "description": "Create Blockchain transactions with Vanilla JS (0 deps, cross-platform)",
+  "main": "index.js",
+  "files": [
+    "index.js",
+    "blocktx.js",
+    "./lib/",
+    "./shims/"
+  ],
+  "browser": {
+    "index.js": "blocktx.js",
+    "./shims/node-crypto.js": "./shims/browser-crypto.js",
+    "crypto": false
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "version": "npm version -m \"chore(release): bump to v%s\"",
+    "fmt": "npx -p prettier@2.x -- prettier -w '**/*.{js,md}'",
+    "lint": "npx -p typescript@4.x -- tsc -p ./jsconfig.json",
+    "prepublish": "npx -p jswt@1.x -- reexport"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dashhive/blocktx.js.git"
+  },
+  "keywords": [],
+  "author": "AJ ONeal <aj@therootcompany.com> (https://throotcompany.com/)",
+  "license": "SEE LICENSE IN LICENSE",
+  "bugs": {
+    "url": "https://github.com/dashhive/blocktx.js/issues"
+  },
+  "homepage": "https://github.com/dashhive/blocktx.js#readme",
+  "dependencies": {
+  },
+  "devDependencies": {
+    "@dashincubator/secp256k1": "^1.7.1-1"
+  }
+}
