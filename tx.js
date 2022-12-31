@@ -38,6 +38,95 @@
   const E_TOO_BIG_INT =
     "JavaScript 'BigInt's are arbitrarily large, but you may only use up to UINT64 for transactions";
 
+  Tx.create = function (myUtils) {
+    async function hashAndSignAll(txInfo) {
+      return await Tx._hashAndSignAll(txInfo, myUtils);
+    }
+
+    return {
+      hashAndSignAll: hashAndSignAll,
+    };
+  };
+
+  Tx._hashAndSignAll = async function (txInfo, myUtils) {
+    let sigHashType = 0x01;
+
+    /*
+    let privateKeys = txInfo?.getPrivateKeys() || [];
+
+    let numInputs = txInfo.inputs?.length || 0;
+    let numPrivateKeys = privateKeys.length || 0;
+    let hasPrivateKeys = numInputs === numPrivateKeys;
+    if (!hasPrivateKeys) {
+      throw new Error(
+        `expected 'getPrivateKeys()' to return a list of '${numInputs}' private keys to match '${numInputs}' inputs, but got '${numPrivateKeys}' instead`,
+      );
+    }
+    */
+
+    let txInfoSigned = {
+      /** @type {Array<TxInputHashable|TxInputSigned>} */
+      inputs: [],
+      outputs: txInfo.outputs,
+    };
+
+    // TODO should copy getPrivateKeys
+    //let txHashables = Tx.createHashableAll(txInfo);
+
+    // TODO subscript -> lockScript, sigScript
+    //let lockScriptHex = txInput.subscript;
+    //let txHashBufs = await Tx.hashPartialAll(txHashables, sigHashType);
+
+    for (let i = 0; i < txInfo.inputs.length; i += 1) {
+      let txInput = txInfo.inputs[i];
+
+      let txHashable = await Tx.createHashable(txInfo, i);
+      let txHashBuf = await Tx.hashPartial(txHashable);
+      //let txHashBuf = txHashBufs[i];
+      let privKey = await txInput.getPrivateKey();
+      //let privKey = privateKeys[i];
+
+      let sigHex = await myUtils.sign({
+        privateKey: privKey,
+        hash: txHashBuf,
+      });
+
+      let pubKeyHex = txInput.publicKey;
+      if (!pubKeyHex) {
+        pubKeyHex = myUtils.toPublicKey(privKey);
+      }
+
+      let _sigHashType = txInput.sigHashType ?? sigHashType;
+      let txInputSigned = {
+        txId: txInput.txId,
+        prevIndex: txInput.prevIndex,
+        signature: sigHex.toString(),
+        publicKey: pubKeyHex.toString(),
+        sigHashType: _sigHashType,
+      };
+
+      // expose _actual_ values used, for debugging
+      let txHashHex = Tx.utils.u8ToHex(txHashBuf);
+      txInput._hash = txHashHex;
+      txInput._signature = sigHex.toString();
+      txInput._lockScript = txInfo.inputs[i].subscript;
+      txInput._publicKey = pubKeyHex.toString();
+      txInput._sigHashType = sigHashType;
+
+      txInfoSigned.inputs[i] = txInputSigned;
+    }
+
+    let transaction = Tx.createSigned(txInfoSigned);
+
+    return {
+      inputs: txInfo.inputs,
+      locktime: txInfo.locktime || 0x0,
+      outputs: txInfo.outputs,
+      transaction: transaction,
+      version: txInfo.version,
+    };
+  };
+
   /**
    * @param {Object} opts
    * @param {Array<TxInputRaw>} opts.inputs
@@ -49,16 +138,8 @@
     opts = Object.assign({}, opts);
     opts.inputs = opts.inputs.map(function (input) {
       return {
-        txId:
-          input.txId ??
-          //@ts-ignore
-          input.txid,
-        prevIndex:
-          input.prevIndex ??
-          //@ts-ignore
-          input.index ??
-          //@ts-ignore
-          input.vout,
+        txId: input.txId,
+        prevIndex: input.prevIndex,
       };
     });
 
@@ -67,43 +148,19 @@
   };
 
   /**
-   * @param {Object} opts
-   * @param {Array<TxInputHashable>} opts.inputs
-   * @param {Array<TxOutput>} opts.outputs
-   * @param {Number} [opts.version]
-   * @param {Boolean} [opts._debug] - bespoke debug output
-   * @returns {Array<String>} - returns a hashable TX for each input, in order
+   * @param {Object} txInfo
+   * @param {Array<TxInputHashable>} txInfo.inputs
+   * @param {Array<TxOutput>} txInfo.outputs
+   * @param {Number} [txInfo.version]
+   * @param {Boolean} [txInfo._debug] - bespoke debug output
+   * @param {Number} inputIndex - create hashable tx for this input
    */
-  Tx.createHashableAll = function (opts) {
-    let hashables = opts.inputs.map(function (_, i) {
-      return Tx.createHashable(opts, i);
-    });
+  Tx.createHashable = function (txInfo, inputIndex) {
+    let txInfoHashable = Object.assign({}, txInfo);
 
-    return hashables;
-  };
-
-  /**
-   * @param {Object} opts
-   * @param {Array<TxInputHashable>} opts.inputs
-   * @param {Array<TxOutput>} opts.outputs
-   * @param {Number} [opts.version]
-   * @param {Boolean} [opts._debug] - bespoke debug output
-   * @param {Number} [inputIndex] - create hashable tx for this input
-   */
-  Tx.createHashable = function (opts, inputIndex = -1) {
-    if (inputIndex < 0) {
-      // Is this a footgun convenience?
-      if (opts.inputs.length > 1) {
-        throw new Error(
-          `'inputIndex' must be specified for each 'input' when there are multiple 'input's`,
-        );
-      }
-      inputIndex = 0;
-    }
-    opts = Object.assign({}, opts);
     /** @type {Array<TxInputRaw|TxInputHashable>} */
     //@ts-ignore
-    opts.inputs = opts.inputs.map(function (input, i) {
+    txInfoHashable.inputs = txInfo.inputs.map(function (input, i) {
       if (inputIndex !== i) {
         return {
           txId: input.txId,
@@ -120,32 +177,20 @@
         }
         subscript = `${PKH_SCRIPT_SIZE}${OP_DUP}${OP_HASH160}${PKH_SIZE}${input.pubKeyHash}${OP_EQUALVERIFY}${OP_CHECKSIG}`;
       }
-      return {
-        txId:
-          input.txId ??
-          //@ts-ignore
-          input.txid,
-        prevIndex:
-          input.prevIndex ??
-          //@ts-ignore
-          input.index ??
-          //@ts-ignore
-          input.vout,
-        pubKeyHash:
-          input.pubKeyHash ??
-          //@ts-ignore
-          input.pubkeyhash ??
-          //@ts-ignore
-          input.pubkeyHash,
-        sigHashType:
-          input.sigHashType ??
-          //@ts-ignore
-          input.sighashType,
+
+      // TODO fix the names
+      let txInputHashable = {
+        txId: input.txId,
+        prevIndex: input.prevIndex,
+        pubKeyHash: input.pubKeyHash,
+        sigHashType: input.sigHashType,
         subscript: subscript,
       };
+
+      return txInputHashable;
     });
 
-    let hex = Tx._create(opts);
+    let hex = Tx._create(txInfo);
     return hex;
   };
 
@@ -255,8 +300,8 @@
       let units = toUint64LE(output.units);
       tx.push(units);
 
-      assertHex(output.pubkeyhash, `output[${i}].pubkeyhash`);
-      let lockScript = `${PKH_SCRIPT_SIZE}${OP_DUP}${OP_HASH160}${PKH_SIZE}${output.pubkeyhash}${OP_EQUALVERIFY}${OP_CHECKSIG}`;
+      assertHex(output.pubKeyHash, `output[${i}].pubKeyHash`);
+      let lockScript = `${PKH_SCRIPT_SIZE}${OP_DUP}${OP_HASH160}${PKH_SIZE}${output.pubKeyHash}${OP_EQUALVERIFY}${OP_CHECKSIG}`;
       tx.push(lockScript);
     });
 
@@ -273,10 +318,6 @@
    */
   Tx.getId = async function (txHex) {
     let u8 = Tx.utils.hexToU8(txHex);
-    console.log("Broadcastable Tx Buffer");
-    console.log(u8);
-    console.log();
-
     let hashU8 = await Tx._hash(u8);
 
     let reverseU8 = new Uint8Array(hashU8.length);
@@ -286,9 +327,8 @@
       reverseIndex -= 1;
     });
 
-    console.log("Reversed Round 2 Hash Buffer");
-    console.log(reverseU8);
-    console.log();
+    //console.log("Reversed Round 2 Hash Buffer");
+    //console.log(reverseU8);
 
     let id = Tx.utils.u8ToHex(reverseU8);
     return id;
@@ -314,24 +354,6 @@
 
     let hashU8 = await Tx._hash(u8);
     return hashU8;
-  };
-
-  /**
-   * @param {Array<String>} txHexes - signable tx hex (like raw tx, but with subscript)
-   * @param {Number} [sigHashType] - typically 0x01 (SIGHASH_ALL) for signable
-   * @returns {Promise<Array<Uint8Array>>}
-   */
-  Tx.hashPartialAll = async function (txHexes, sigHashType = 0x01) {
-    /** @type {Array<Uint8Array>} */
-    let hashes = [];
-
-    await txHexes.reduce(async function (promise, txHex) {
-      await promise;
-      let hash = await Tx.hashPartial(txHex, sigHashType);
-      hashes.push(hash);
-    }, Promise.resolve());
-
-    return hashes;
   };
 
   /**
@@ -613,7 +635,7 @@ b3 24 00 00 00 00 00 00 # satoshis
  * @prop {String} signature - hex-encoded ASN.1 (DER) signature (starts with 0x30440220 or  0x30440221)
  * @prop {String} [subscript] - the previous lock script (default: derived from public key as p2pkh)
  * @prop {String} publicKey - hex-encoded public key (typically starts with a 0x02 or 0x03 prefix)
- * @prop {String} [pubKeyHash] - the 20-byte pubkeyhash (address without magic byte or checksum)
+ * @prop {String} [pubKeyHash] - the 20-byte pubKeyHash (address without magic byte or checksum)
  * @prop {Number} sigHashType - typically 0x01 (SIGHASH_ALL)
  */
 
@@ -626,10 +648,10 @@ b3 24 00 00 00 00 00 00 # satoshis
 /**
  * @typedef TxInputHashable
  * @prop {String} txId - hex (not pre-reversed)
- * @prop {Number} prevIndex - index in previous tx's output (vout index)
+ * @prop {Number} prevIndex - index in previous tx's output (vout output index)
  * @prop {String} [signature] - (included as type hack)
  * @prop {String} [subscript] - the previous lock script (default: derived from public key as p2pkh)
- * @prop {String} [pubKeyHash] - the 20-byte pubkeyhash (address without magic byte or checksum)
+ * @prop {String} [pubKeyHash] - the 20-byte pubKeyHash (address without magic byte or checksum)
  * @prop {Number} sigHashType - typically 0x01 (SIGHASH_ALL)
  */
 
@@ -639,6 +661,6 @@ b3 24 00 00 00 00 00 00 # satoshis
 
 /**
  * @typedef TxOutput
- * @prop {String} pubkeyhash - payaddr's raw hex value (decoded, not Base58Check)
+ * @prop {String} pubKeyHash - payaddr's raw hex value (decoded, not Base58Check)
  * @prop {Number} units - the number of smallest units of the currency (duffs / satoshis)
  */
