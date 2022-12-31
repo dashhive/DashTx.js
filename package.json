@@ -1,6 +1,6 @@
 {
   "name": "@dashincubator/blocktx",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Create Blockchain transactions with Vanilla JS (0 deps, cross-platform)",
   "main": "index.js",
   "files": [
@@ -35,8 +35,7 @@
     "url": "https://github.com/dashhive/blocktx.js/issues"
   },
   "homepage": "https://github.com/dashhive/blocktx.js#readme",
-  "dependencies": {
-  },
+  "dependencies": {},
   "devDependencies": {
     "@dashincubator/secp256k1": "^1.7.1-1"
   }
