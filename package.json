@@ -1,6 +1,6 @@
 {
   "name": "@dashincubator/blocktx",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "Create Blockchain transactions with Vanilla JS (0 deps, cross-platform)",
   "main": "index.js",
   "files": [
