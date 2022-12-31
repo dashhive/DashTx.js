@@ -305,14 +305,12 @@
       let sigHashTypeHex = toUint32LE(sigHashType);
       txSignable = `${txSignable}${sigHashTypeHex}`;
     }
-    console.log("Signable Tx Hex");
-    console.log(txSignable);
-    console.log();
+    //console.log("Signable Tx Hex");
+    //console.log(txSignable);
 
     let u8 = Tx.utils.hexToU8(txSignable);
-    console.log("Signable Tx Buffer");
-    console.log(u8);
-    console.log();
+    //console.log("Signable Tx Buffer");
+    //console.log(u8);
 
     let hashU8 = await Tx._hash(u8);
     return hashU8;
@@ -342,16 +340,14 @@
    */
   Tx._hash = async function (u8) {
     let ab = await Crypto.subtle.digest({ name: "SHA-256" }, u8);
-    console.log("Round 1 Hash Buffer");
-    console.log(ab);
-    console.log();
+    //console.log("Round 1 Hash Buffer");
+    //console.log(ab);
 
     ab = await Crypto.subtle.digest({ name: "SHA-256" }, ab);
     let hashU8 = new Uint8Array(ab);
 
-    console.log("Round 2 Hash Buffer");
-    console.log(hashU8);
-    console.log();
+    //console.log("Round 2 Hash Buffer");
+    //console.log(hashU8);
 
     return hashU8;
   };
