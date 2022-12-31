@@ -61,13 +61,15 @@ let txInfo = {
   ],
   outputs: [
     {
-      pubkeyhash: "5bcd0d776a7252310b9f1a7eee1a749d42126944",
-      //pubkeyhash: "1e0a6ef6085bb8af443a9e7f8941e61deb09fb54",
+      pubKeyHash: "5bcd0d776a7252310b9f1a7eee1a749d42126944",
+      //pubKeyHash: "1e0a6ef6085bb8af443a9e7f8941e61deb09fb54",
       units: splitValue,
     },
     {
-      pubkeyhash: "5bcd0d776a7252310b9f1a7eee1a749d42126944",
-      //pubkeyhash: "1e0a6ef6085bb8af443a9e7f8941e61deb09fb54",
+      // for Xj4E...
+      pubKeyHash: "5bcd0d776a7252310b9f1a7eee1a749d42126944",
+      // for XdRg...
+      //pubKeyHash: "1e0a6ef6085bb8af443a9e7f8941e61deb09fb54",
       units: splitValue,
     },
   ],

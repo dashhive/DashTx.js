@@ -95,7 +95,7 @@ let txInfo = {
   ],
   outputs: [
     {
-      pubkeyhash: "1e0a6ef6085bb8af443a9e7f8941e61deb09fb54",
+      pubKeyHash: "1e0a6ef6085bb8af443a9e7f8941e61deb09fb54",
       units: 5150,
     },
   ],
@@ -138,7 +138,7 @@ let txInfo = {
   outputs: [
     {
       // "XdRgbwH1LEfFQUVY2DnmsVxfo33CRDhydj"
-      pubkeyhash: "1e0a6ef6085bb8af443a9e7f8941e61deb09fb54",
+      pubKeyHash: "1e0a6ef6085bb8af443a9e7f8941e61deb09fb54",
       units: 5150,
     },
   ],
@@ -174,7 +174,7 @@ console.info(txInfo.transaction);
   "locktime": 0,
   "outputs": [
     {
-      "pubkeyhash": "1e0a6ef6085bb8af443a9e7f8941e61deb09fb54",
+      "pubKeyHash": "1e0a6ef6085bb8af443a9e7f8941e61deb09fb54",
       "units": 5150
     }
   ],

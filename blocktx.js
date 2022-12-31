@@ -335,8 +335,8 @@
       let units = toUint64LE(output.units);
       tx.push(units);
 
-      assertHex(output.pubkeyhash, `output[${i}].pubkeyhash`);
-      let lockScript = `${PKH_SCRIPT_SIZE}${OP_DUP}${OP_HASH160}${PKH_SIZE}${output.pubkeyhash}${OP_EQUALVERIFY}${OP_CHECKSIG}`;
+      assertHex(output.pubKeyHash, `output[${i}].pubKeyHash`);
+      let lockScript = `${PKH_SCRIPT_SIZE}${OP_DUP}${OP_HASH160}${PKH_SIZE}${output.pubKeyHash}${OP_EQUALVERIFY}${OP_CHECKSIG}`;
       tx.push(lockScript);
     });
 
@@ -673,7 +673,7 @@ b3 24 00 00 00 00 00 00 # satoshis
  * @prop {String} signature - hex-encoded ASN.1 (DER) signature (starts with 0x30440220 or  0x30440221)
  * @prop {String} [subscript] - the previous lock script (default: derived from public key as p2pkh)
  * @prop {String} publicKey - hex-encoded public key (typically starts with a 0x02 or 0x03 prefix)
- * @prop {String} [pubKeyHash] - the 20-byte pubkeyhash (address without magic byte or checksum)
+ * @prop {String} [pubKeyHash] - the 20-byte pubKeyHash (address without magic byte or checksum)
  * @prop {Number} sigHashType - typically 0x01 (SIGHASH_ALL)
  */
 
@@ -690,7 +690,7 @@ b3 24 00 00 00 00 00 00 # satoshis
  * @prop {String} [signature] - (included as type hack)
  * @prop {String} [subscript] - the previous lock script (default: derived from public key as p2pkh)
  * @prop {String} [publicKey] - hex-encoded public key (typically starts with a 0x02 or 0x03 prefix)
- * @prop {String} [pubKeyHash] - the 20-byte pubkeyhash (address without magic byte or checksum)
+ * @prop {String} [pubKeyHash] - the 20-byte pubKeyHash (address without magic byte or checksum)
  * @prop {Number} sigHashType - typically 0x01 (SIGHASH_ALL)
  */
 
@@ -700,7 +700,7 @@ b3 24 00 00 00 00 00 00 # satoshis
 
 /**
  * @typedef TxOutput
- * @prop {String} pubkeyhash - payaddr's raw hex value (decoded, not Base58Check)
+ * @prop {String} pubKeyHash - payaddr's raw hex value (decoded, not Base58Check)
  * @prop {Number} units - the number of smallest units of the currency (duffs / satoshis)
  */
 
