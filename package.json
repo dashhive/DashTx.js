@@ -2,7 +2,7 @@
   "name": "bundlephobia-shim-blocktx",
   "version": "0.8.2-4",
   "description": "Create Blockchain transactions with Vanilla JS (0 deps, cross-platform)",
-  "main": "blocktx.js",
+  "main": "index.js",
   "files": [
     "index.js",
     "blocktx.js",
