@@ -84,10 +84,10 @@ let txInfo = {
   inputs: [
     {
       txId: "7f3055...e8352b",
-      prevIndex: 0,
+      outputIndex: 0,
       publicKey: "5bcd0d776a7252310b9f1a7eee1a749d42126944",
       sigHashType: 0x01,
-      subscript: "76a9145bcd...694488ac",
+      script: "76a9145bcd...694488ac",
       getPrivateKey: function () {
         return privateKeyBuf;
       },
@@ -124,12 +124,12 @@ let txInfo = {
   inputs: [
     {
       txId: "7f305558cbeba3a9271d2559e8277f473f29d6b64a7a7a27e02a8564bde8352b",
-      prevIndex: 0,
+      outputIndex: 0,
       // "Xj4Ey1oerk5KUKM71UQCTUBbmfyQuoUHDr"
       // "5bcd0d776a7252310b9f1a7eee1a749d42126944"
       publicKey: publicKeyHex,
       sigHashType: 0x01,
-      subscript: "76a9145bcd0d776a7252310b9f1a7eee1a749d4212694488ac",
+      script: "76a9145bcd0d776a7252310b9f1a7eee1a749d4212694488ac",
       getPrivateKey: function () {
         return privateKey;
       },
@@ -148,7 +148,7 @@ let txInfo = {
 let txInfoSigned = await tx.hashAndSignAll(txInfo);
 
 console.info(JSON.stringify(txInfo, null, 2));
-console.info(txInfo.transaction);
+console.info(txInfoSigned.transaction);
 ```
 
 ### Example Output
@@ -163,10 +163,10 @@ console.info(txInfo.transaction);
   "inputs": [
     {
       "txId": "7f305558cbeba3a9271d2559e8277f473f29d6b64a7a7a27e02a8564bde8352b",
-      "prevIndex": 0,
+      "outputIndex": 0,
       "publicKey": "03755be68d084e7ead4d83e23fb37c3076b16ead432de1b0bdf249290400f263cb",
       "sigHashType": 1,
-      "subscript": "76a9145bcd0d776a7252310b9f1a7eee1a749d4212694488ac",
+      "script": "76a9145bcd0d776a7252310b9f1a7eee1a749d4212694488ac",
       "_hash": "3c6610e19c9a0f7c373da87b429f2eb098f318409a0cfdafb2a2b743dbdb0820",
       "_signature": "3045022100f88938da326af08203495a94b9a91b4bd11266df096cb67757a17eed1cb761b702205f90d94ead2d68086ba9141959115961cc491d560ce422c1a56a6c165697897e"
     }
@@ -210,6 +210,12 @@ Tx.OUTPUT_SIZE         //  34
  * Creates a tx signer instance.
  */
 Tx.create({ sign });
+
+/**
+ * Estimates the min and max fees for a transaction.
+ */
+Tx.estimate({ inputs, outputs });
+// [191, 193]
 
 /**
  * Creates the variety of required hashable transactions

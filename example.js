@@ -42,8 +42,8 @@ let txInfo = {
   inputs: [
     {
       txId: txId,
-      prevIndex: 0,
-      subscript: prevLockScript,
+      outputIndex: 0,
+      script: prevLockScript,
       sigHashType: sigHashType,
       getPrivateKey: function () {
         return Tx.utils.hexToU8(privKeyHex);
@@ -51,8 +51,8 @@ let txInfo = {
     },
     {
       txId: txId,
-      prevIndex: 1,
-      subscript: prevLockScript,
+      outputIndex: 1,
+      script: prevLockScript,
       sigHashType: sigHashType,
       getPrivateKey: function () {
         return Tx.utils.hexToU8(privKeyHex);
@@ -79,26 +79,20 @@ let txInfo = {
 let tx = Tx.create({
   // required
   sign: async function ({ privateKey, hash }) {
-    let sig = await Secp256k1.sign(hash, privateKey, {
+    let sigBuf = await Secp256k1.sign(hash, privateKey, {
       canonical: true,
     });
-
-    // Just needs to be stringable
-    return {
-      toString: function () {
-        return Tx.utils.u8ToHex(sig);
-      },
-    };
+    return sigBuf;
+  },
+  getPrivateKey: async function (txInput) {
+    let privKey = txInput.getPrivateKey();
+    return privKey;
   },
   // convenience
-  toPublicKey: function (privateKey) {
+  toPublicKey: async function (privateKey) {
     let isCompressed = true;
     let pubKeyBuf = Secp256k1.getPublicKey(privateKey, isCompressed);
-    return {
-      toString: function () {
-        return Tx.utils.u8ToHex(pubKeyBuf);
-      },
-    };
+    return pubKeyBuf;
   },
   // convenience
   ripemd160: function () {},
