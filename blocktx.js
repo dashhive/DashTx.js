@@ -38,6 +38,10 @@
   const E_TOO_BIG_INT =
     "JavaScript 'BigInt's are arbitrarily large, but you may only use up to UINT64 for transactions";
 
+  Tx._HEADER_ONLY_SIZE =
+    4 + // version
+    4; // locktime
+
   Tx.HEADER_SIZE =
     4 + // version
     1 + // input count
@@ -46,15 +50,15 @@
 
   Tx.MIN_INPUT_SIZE = // 147~149 each
     4 + // prevIndex
-    32 + // txid
+    32 + // txId
     1 + // sigscriptsize
     106 + // sigscript
     4; // sequence
 
-  Tx.MAX_INPUT_PAD = // possible BigInt padding
+  Tx.MAX_INPUT_PAD = // possible ASN.1 BigInt padding
     1 + // Signature R value
     1 + // Signature S value
-    1; // Public Key value
+    0; // Public Key value is NOT BigInt padded
 
   Tx.MAX_INPUT_SIZE = Tx.MIN_INPUT_SIZE + Tx.MAX_INPUT_PAD;
 
@@ -62,6 +66,25 @@
     8 + // base units value
     1 + // lockscript size
     25; // lockscript
+
+  /**
+   * @param {TxInfo} txInfo
+   * @returns {[Number, Number]}
+   */
+  Tx.estimate = function (txInfo) {
+    let size = Tx._HEADER_ONLY_SIZE;
+
+    size += Tx.utils.toVarIntSize(txInfo.inputs.length);
+    size += Tx.MIN_INPUT_SIZE * txInfo.inputs.length;
+
+    size += Tx.utils.toVarIntSize(txInfo.outputs.length);
+    size += Tx.OUTPUT_SIZE * txInfo.outputs.length;
+
+    let maxPadding = Tx.MAX_INPUT_PAD * txInfo.inputs.length;
+    let maxSize = size + maxPadding;
+
+    return [size, maxSize];
+  };
 
   /**
    * @param {TxDeps} myUtils
@@ -111,7 +134,9 @@
 
       let pubKeyHex = txInput.publicKey;
       if (!pubKeyHex) {
-        pubKeyHex = myUtils.toPublicKey(privKey);
+        //let pubKey = await myUtils.toPublicKey(privKey);
+        //pubKeyHex = Tx.utils.u8ToHex(pubKey);
+        pubKeyHex = await myUtils.toPublicKey(privKey);
       }
 
       let _sigHashType = txInput.sigHashType ?? sigHashType;
@@ -427,6 +452,9 @@
   Tx.utils.toVarInt = function (n) {
     if (n < 253) {
       return n.toString(16).padStart(2, "0");
+    }
+    if (!n) {
+      throw new Error(`'${n}' is not a number`);
     }
 
     if (n <= MAX_U16) {

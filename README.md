@@ -148,7 +148,7 @@ let txInfo = {
 let txInfoSigned = await tx.hashAndSignAll(txInfo);
 
 console.info(JSON.stringify(txInfo, null, 2));
-console.info(txInfo.transaction);
+console.info(txInfoSigned.transaction);
 ```
 
 ### Example Output
@@ -210,6 +210,12 @@ Tx.OUTPUT_SIZE         //  34
  * Creates a tx signer instance.
  */
 Tx.create({ sign });
+
+/**
+ * Estimates the min and max fees for a transaction.
+ */
+Tx.estimate({ inputs, outputs });
+// [191, 193]
 
 /**
  * Creates the variety of required hashable transactions

@@ -91,7 +91,7 @@ let tx = Tx.create({
     };
   },
   // convenience
-  toPublicKey: function (privateKey) {
+  toPublicKey: async function (privateKey) {
     let isCompressed = true;
     let pubKeyBuf = Secp256k1.getPublicKey(privateKey, isCompressed);
     return {
