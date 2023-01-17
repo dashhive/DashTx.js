@@ -42,7 +42,7 @@ let txInfo = {
   inputs: [
     {
       txId: txId,
-      prevIndex: 0,
+      outputIndex: 0,
       subscript: prevLockScript,
       sigHashType: sigHashType,
       getPrivateKey: function () {
@@ -51,7 +51,7 @@ let txInfo = {
     },
     {
       txId: txId,
-      prevIndex: 1,
+      outputIndex: 1,
       subscript: prevLockScript,
       sigHashType: sigHashType,
       getPrivateKey: function () {

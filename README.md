@@ -84,7 +84,7 @@ let txInfo = {
   inputs: [
     {
       txId: "7f3055...e8352b",
-      prevIndex: 0,
+      outputIndex: 0,
       publicKey: "5bcd0d776a7252310b9f1a7eee1a749d42126944",
       sigHashType: 0x01,
       subscript: "76a9145bcd...694488ac",
@@ -124,7 +124,7 @@ let txInfo = {
   inputs: [
     {
       txId: "7f305558cbeba3a9271d2559e8277f473f29d6b64a7a7a27e02a8564bde8352b",
-      prevIndex: 0,
+      outputIndex: 0,
       // "Xj4Ey1oerk5KUKM71UQCTUBbmfyQuoUHDr"
       // "5bcd0d776a7252310b9f1a7eee1a749d42126944"
       publicKey: publicKeyHex,
@@ -163,7 +163,7 @@ console.info(txInfo.transaction);
   "inputs": [
     {
       "txId": "7f305558cbeba3a9271d2559e8277f473f29d6b64a7a7a27e02a8564bde8352b",
-      "prevIndex": 0,
+      "outputIndex": 0,
       "publicKey": "03755be68d084e7ead4d83e23fb37c3076b16ead432de1b0bdf249290400f263cb",
       "sigHashType": 1,
       "subscript": "76a9145bcd0d776a7252310b9f1a7eee1a749d4212694488ac",

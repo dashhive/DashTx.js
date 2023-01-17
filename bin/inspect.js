@@ -54,10 +54,10 @@ async function main() {
     console.info("   ", txId.slice(32, 48));
     console.info("   ", txId.slice(48, 64));
 
-    let prevIndexHex = hex.substr(next, 8);
-    let prevIndex = parseInt(prevIndexHex.slice(0, 2));
+    let outputIndexHex = hex.substr(next, 8);
+    let outputIndex = parseInt(outputIndexHex.slice(0, 2));
     console.info(
-      `    ${prevIndexHex}              # Previous Output index (${prevIndex})`,
+      `    ${outputIndexHex}              # Previous Output index (${outputIndex})`,
     );
     next += 8;
 

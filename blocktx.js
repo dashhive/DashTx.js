@@ -49,7 +49,7 @@
     4; // locktime
 
   Tx.MIN_INPUT_SIZE = // 147~149 each
-    4 + // prevIndex
+    4 + // outputIndex
     32 + // txId
     1 + // sigscriptsize
     106 + // sigscript
@@ -142,7 +142,7 @@
       let _sigHashType = txInput.sigHashType ?? sigHashType;
       let txInputSigned = {
         txId: txInput.txId,
-        prevIndex: txInput.prevIndex,
+        outputIndex: txInput.outputIndex,
         signature: sigHex.toString(),
         publicKey: pubKeyHex.toString(),
         sigHashType: _sigHashType,
@@ -185,8 +185,8 @@
           input.txId ??
           //@ts-ignore
           input.txid,
-        prevIndex:
-          input.prevIndex ??
+        outputIndex:
+          input.outputIndex ??
           //@ts-ignore
           input.index ??
           //@ts-ignore
@@ -211,7 +211,7 @@
       if (inputIndex !== i) {
         return {
           txId: input.txId,
-          prevIndex: input.prevIndex,
+          outputIndex: input.outputIndex,
         };
       }
 
@@ -226,7 +226,7 @@
       }
       return {
         txId: input.txId,
-        prevIndex: input.prevIndex,
+        outputIndex: input.outputIndex,
         pubKeyHash: input.pubKeyHash,
         sigHashType: input.sigHashType,
         subscript: subscript,
@@ -298,7 +298,7 @@
       inputHex.push(reverseTxid);
 
       //@ts-ignore
-      let voutIndex = input.prevIndex ?? input.index ?? input.vout;
+      let voutIndex = input.outputIndex ?? input.index ?? input.vout;
       if (isNaN(voutIndex)) {
         throw new Error(
           "expected utxo property'vout' to be an integer representing this input's previous output index",
@@ -681,7 +681,7 @@ b3 24 00 00 00 00 00 00 # satoshis
 /**
  * @typedef TxInput
  * @prop {String} txId - hex (not pre-reversed)
- * @prop {Number} prevIndex - index in previous tx's output (vout index)
+ * @prop {Number} outputIndex - index in previous tx's output (vout index)
  * @prop {String} signature - hex-encoded ASN.1 (DER) signature (starts with 0x30440220 or  0x30440221)
  * @prop {String} [subscript] - the previous lock script (default: derived from public key as p2pkh)
  * @prop {String} publicKey - hex-encoded public key (typically starts with a 0x02 or 0x03 prefix)
@@ -692,13 +692,13 @@ b3 24 00 00 00 00 00 00 # satoshis
 /**
  * @typedef TxInputRaw
  * @prop {String} txId - hex (not pre-reversed)
- * @prop {Number} prevIndex - index in previous tx's output (vout index)
+ * @prop {Number} outputIndex - index in previous tx's output (vout index)
  */
 
 /**
  * @typedef TxInputHashable
  * @prop {String} txId - hex (not pre-reversed)
- * @prop {Number} prevIndex - index in previous tx's output (vout index)
+ * @prop {Number} outputIndex - index in previous tx's output (vout index)
  * @prop {String} [signature] - (included as type hack)
  * @prop {String} [subscript] - the previous lock script (default: derived from public key as p2pkh)
  * @prop {String} [publicKey] - hex-encoded public key (typically starts with a 0x02 or 0x03 prefix)
@@ -707,7 +707,7 @@ b3 24 00 00 00 00 00 00 # satoshis
  */
 
 /**
- * @typedef {Pick<TxInput, "txId"|"prevIndex"|"signature"|"publicKey"|"sigHashType">} TxInputSigned
+ * @typedef {Pick<TxInput, "txId"|"outputIndex"|"signature"|"publicKey"|"sigHashType">} TxInputSigned
  */
 
 /**
