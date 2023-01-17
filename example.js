@@ -43,7 +43,7 @@ let txInfo = {
     {
       txId: txId,
       outputIndex: 0,
-      subscript: prevLockScript,
+      script: prevLockScript,
       sigHashType: sigHashType,
       getPrivateKey: function () {
         return Tx.utils.hexToU8(privKeyHex);
@@ -52,7 +52,7 @@ let txInfo = {
     {
       txId: txId,
       outputIndex: 1,
-      subscript: prevLockScript,
+      script: prevLockScript,
       sigHashType: sigHashType,
       getPrivateKey: function () {
         return Tx.utils.hexToU8(privKeyHex);
@@ -89,6 +89,10 @@ let tx = Tx.create({
         return Tx.utils.u8ToHex(sig);
       },
     };
+  },
+  getPrivateKey: async function (txInput) {
+    let privKey = txInput.getPrivateKey();
+    return privKey;
   },
   // convenience
   toPublicKey: async function (privateKey) {

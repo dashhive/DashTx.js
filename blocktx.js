@@ -103,11 +103,11 @@
   };
 
   /**
-   * @param {Object} txInfo
-   * @param {Array<TxInputRaw>} txInfo.inputs
-   * @param {Array<TxOutput>} txInfo.outputs
-   * @param {Number} [txInfo.version]
-   * @param {Boolean} [txInfo._debug] - bespoke debug output
+   * @param {TxInfo} txInfo
+   * TODO _param {Array<TxInputRaw>} txInfo.inputs - needs type narrowing check
+   * TODO _param {Array<TxOutput>} txInfo.outputs
+   * TODO _param {Number} [txInfo.version]
+   * TODO _param {Boolean} [txInfo._debug] - bespoke debug output
    * @param {TxDeps} myUtils
    */
   Tx._hashAndSignAll = async function (txInfo, myUtils) {
@@ -119,13 +119,30 @@
       outputs: txInfo.outputs,
     };
 
+    // temp shim
+    if (!myUtils.getPrivateKey) {
+      myUtils.getPrivateKey = async function (txInput) {
+        let privKey = txInput.getPrivateKey();
+        return privKey;
+      };
+    }
+    // temp shim
+    if (!myUtils.getPublicKey) {
+      myUtils.getPublicKey = async function (txInput, i, inputs) {
+        let privKey = myUtils.getPrivateKey(txInput, i, inputs);
+        let pubKeyHex = await myUtils.toPublicKey(privKey);
+        let pubKey = Tx.utils.hexToU8(pubKeyHex);
+        return pubKey;
+      };
+    }
+
     for (let i = 0; i < txInfo.inputs.length; i += 1) {
       let txInput = txInfo.inputs[i];
-      // TODO subscript -> lockScript, sigScript
-      //let lockScriptHex = txInput.subscript;
+      // TODO script -> lockScript, sigScript
+      //let lockScriptHex = txInput.script;
       let txHashable = Tx.createHashable(txInfo, i);
       let txHashBuf = await Tx.hashPartial(txHashable, txInput.sigHashType);
-      let privKey = txInput.getPrivateKey();
+      let privKey = myUtils.getPrivateKey(txInput, i, txInfo.inputs);
 
       let sigHex = await myUtils.sign({
         privateKey: privKey,
@@ -134,9 +151,8 @@
 
       let pubKeyHex = txInput.publicKey;
       if (!pubKeyHex) {
-        //let pubKey = await myUtils.toPublicKey(privKey);
-        //pubKeyHex = Tx.utils.u8ToHex(pubKey);
-        pubKeyHex = await myUtils.toPublicKey(privKey);
+        let pubKey = await myUtils.getPublicKey(txInput, i, txInfo.inputs);
+        pubKeyHex = Tx.utils.u8ToHex(pubKey);
       }
 
       let _sigHashType = txInput.sigHashType ?? sigHashType;
@@ -152,7 +168,7 @@
       let txHashHex = Tx.utils.u8ToHex(txHashBuf);
       txInput._hash = txHashHex;
       txInput._signature = sigHex.toString();
-      txInput._lockScript = txInfo.inputs[i].subscript;
+      txInput._lockScript = txInfo.inputs[i].script;
       txInput._publicKey = pubKeyHex.toString();
       txInput._sigHashType = sigHashType;
 
@@ -215,21 +231,21 @@
         };
       }
 
-      let subscript = input.subscript;
-      if (!subscript) {
+      let lockScript = input.script;
+      if (!lockScript) {
         if (!input.pubKeyHash) {
           throw new Error(
-            `signable input must have either 'pubKeyHash' or 'subscript'`,
+            `signable input must have either 'pubKeyHash' or 'script'`,
           );
         }
-        subscript = `${PKH_SCRIPT_SIZE}${OP_DUP}${OP_HASH160}${PKH_SIZE}${input.pubKeyHash}${OP_EQUALVERIFY}${OP_CHECKSIG}`;
+        lockScript = `${PKH_SCRIPT_SIZE}${OP_DUP}${OP_HASH160}${PKH_SIZE}${input.pubKeyHash}${OP_EQUALVERIFY}${OP_CHECKSIG}`;
       }
       return {
         txId: input.txId,
         outputIndex: input.outputIndex,
         pubKeyHash: input.pubKeyHash,
         sigHashType: input.sigHashType,
-        subscript: subscript,
+        script: lockScript,
       };
     });
 
@@ -307,24 +323,29 @@
       let reverseVout = toUint32LE(voutIndex);
       inputHex.push(reverseVout);
 
-      let sigScriptSize = "00";
-      let sigScript = "";
       if (input.signature) {
         let sigHashTypeVar = Tx.utils.toVarInt(input.sigHashType);
         let sig = `${input.signature}${sigHashTypeVar}`;
         let sigSize = Tx.utils.toVarInt(sig.length / 2);
 
         let keySize = Tx.utils.toVarInt(input.publicKey.length / 2);
-        sigScript = `${sigSize}${sig}${keySize}${input.publicKey}`;
-        let _sigScriptSize = sigScript.length / 2;
-        sigScriptSize = Tx.utils.toVarInt(_sigScriptSize);
-      } else if (input.subscript) {
-        sigScript = input.subscript;
-        let _sigScriptSize = input.subscript.length / 2;
-        sigScriptSize = Tx.utils.toVarInt(_sigScriptSize);
+        let sigScript = `${sigSize}${sig}${keySize}${input.publicKey}`;
+        let sigScriptLen = sigScript.length / 2;
+        let sigScriptLenSize = Tx.utils.toVarInt(sigScriptSize);
+        inputHex.push(sigScriptLenSize);
+        inputHex.push(sigScript);
+      } else if (input.script) {
+        let lockScript = input.script;
+        let lockScriptLen = input.script.length / 2;
+        let lockScriptLenSize = Tx.utils.toVarInt(lockScriptLen);
+        inputHex.push(lockScriptLenSize);
+        inputHex.push(lockScript);
+      } else {
+        let rawScriptSize = "00";
+        let rawScript = "";
+        inputHex.push(rawScriptSize);
+        inputHex.push(rawScript);
       }
-      inputHex.push(sigScriptSize);
-      inputHex.push(sigScript);
 
       let sequence = "ffffffff";
       inputHex.push(sequence);
@@ -357,7 +378,7 @@
   };
 
   /**
-   * @param {String} txHex - signable tx hex (like raw tx, but with subscript)
+   * @param {String} txHex - signable tx hex (like raw tx, but with (sig)script)
    * @returns {Promise<String>} - the reversed double-sha256sum of a ready-to-broadcast tx hex
    */
   Tx.getId = async function (txHex) {
@@ -382,7 +403,7 @@
   };
 
   /**
-   * @param {String} txHex - signable tx hex (like raw tx, but with subscript)
+   * @param {String} txHex - signable tx hex (like raw tx, but with (lock)script)
    * @param {Number} sigHashType - typically 0x01 (SIGHASH_ALL) for signable
    * @returns {Promise<Uint8Array>}
    */
@@ -683,7 +704,7 @@ b3 24 00 00 00 00 00 00 # satoshis
  * @prop {String} txId - hex (not pre-reversed)
  * @prop {Number} outputIndex - index in previous tx's output (vout index)
  * @prop {String} signature - hex-encoded ASN.1 (DER) signature (starts with 0x30440220 or  0x30440221)
- * @prop {String} [subscript] - the previous lock script (default: derived from public key as p2pkh)
+ * @prop {String} [script] - the previous lock script (default: derived from public key as p2pkh)
  * @prop {String} publicKey - hex-encoded public key (typically starts with a 0x02 or 0x03 prefix)
  * @prop {String} [pubKeyHash] - the 20-byte pubKeyHash (address without magic byte or checksum)
  * @prop {Number} sigHashType - typically 0x01 (SIGHASH_ALL)
@@ -700,7 +721,7 @@ b3 24 00 00 00 00 00 00 # satoshis
  * @prop {String} txId - hex (not pre-reversed)
  * @prop {Number} outputIndex - index in previous tx's output (vout index)
  * @prop {String} [signature] - (included as type hack)
- * @prop {String} [subscript] - the previous lock script (default: derived from public key as p2pkh)
+ * @prop {String} [script] - the previous lock script (default: derived from public key as p2pkh)
  * @prop {String} [publicKey] - hex-encoded public key (typically starts with a 0x02 or 0x03 prefix)
  * @prop {String} [pubKeyHash] - the 20-byte pubKeyHash (address without magic byte or checksum)
  * @prop {Number} sigHashType - typically 0x01 (SIGHASH_ALL)
@@ -728,8 +749,10 @@ b3 24 00 00 00 00 00 00 # satoshis
 
 /**
  * @typedef TxDeps
- * @param {TxSign} sign
- * @param {TxToPublicKey} toPublicKey
+ * @prop {TxSign} sign
+ * @prop {TxToPublicKey} [toPublicKey] - deprecated
+ * @prop {TxGetPrivateKey} [getPrivateKey]
+ * @prop {TxGetPublicKey} [getPublicKey]
  */
 
 /**
@@ -739,7 +762,24 @@ b3 24 00 00 00 00 00 00 # satoshis
  */
 
 /**
+ * deprecated
  * @callback TxToPublicKey
  * @param {Uint8Array} privateKey
  * @returns {String} - public key hex
+ */
+
+/**
+ * @callback TxGetPrivateKey
+ * @param {TxInputHashable} txInput
+ * @param {Number} i
+ * @param {Array<TxInputRaw|TxInputHashable>} txInputs
+ * @returns {Uint8Array} - private key Uint8Array
+ */
+
+/**
+ * @callback TxGetPublicKey
+ * @param {TxInputHashable} txInput
+ * @param {Number} i
+ * @param {Array<TxInputRaw|TxInputHashable>} txInputs
+ * @returns {Uint8Array} - public key Uint8Array
  */
