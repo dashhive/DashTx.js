@@ -126,14 +126,14 @@
     // temp shim
     if (!myUtils.getPrivateKey) {
       myUtils.getPrivateKey = async function (txInput) {
-        let privKey = txInput.getPrivateKey();
+        let privKey = await txInput.getPrivateKey();
         return privKey;
       };
     }
     // temp shim
     if (!myUtils.getPublicKey) {
       myUtils.getPublicKey = async function (txInput, i, inputs) {
-        let privKey = myUtils.getPrivateKey(txInput, i, inputs);
+        let privKey =await  myUtils.getPrivateKey(txInput, i, inputs);
         let pubKeyHex = await myUtils.toPublicKey(privKey);
         let pubKey = Tx.utils.hexToU8(pubKeyHex);
         return pubKey;
@@ -146,7 +146,7 @@
       //let lockScriptHex = txInput.script;
       let txHashable = Tx.createHashable(txInfo, i);
       let txHashBuf = await Tx.hashPartial(txHashable, txInput.sigHashType);
-      let privKey = myUtils.getPrivateKey(txInput, i, txInfo.inputs);
+      let privKey = await myUtils.getPrivateKey(txInput, i, txInfo.inputs);
 
       let sigHex = await myUtils.sign({
         privateKey: privKey,
