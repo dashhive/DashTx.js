@@ -92,8 +92,12 @@
   Tx.create = function (myUtils) {
     /**
      * @param {TxInfo} txInfo
+     * @param {TxDeps} [_myUtils]
      */
-    async function hashAndSignAll(txInfo) {
+    async function hashAndSignAll(txInfo, _myUtils) {
+      if (!_myUtils) {
+        _myUtils = myUtils;
+      }
       return await Tx._hashAndSignAll(txInfo, myUtils);
     }
 
