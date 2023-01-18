@@ -63,7 +63,7 @@
   Tx.MAX_INPUT_SIZE = Tx.MIN_INPUT_SIZE + Tx.MAX_INPUT_PAD;
 
   Tx.OUTPUT_SIZE = // 34 each
-    8 + // base units value
+    8 + // satoshis (base units) value
     1 + // lockscript size
     25; // lockscript
 
@@ -396,8 +396,8 @@
       );
     }
     outputs.forEach(function (output, i) {
-      let units = toUint64LE(output.units);
-      tx.push(units);
+      let satoshis = toUint64LE(output.satoshis);
+      tx.push(satoshis);
 
       assertHex(output.pubKeyHash, `output[${i}].pubKeyHash`);
       let lockScript = `${PKH_SCRIPT_SIZE}${OP_DUP}${OP_HASH160}${PKH_SIZE}${output.pubKeyHash}${OP_EQUALVERIFY}${OP_CHECKSIG}`;
@@ -771,7 +771,7 @@ b3 24 00 00 00 00 00 00 # satoshis
 /**
  * @typedef TxOutput
  * @prop {String} pubKeyHash - payaddr's raw hex value (decoded, not Base58Check)
- * @prop {Number} units - the number of smallest units of the currency (duffs / satoshis)
+ * @prop {Number} satoshis - the number of smallest units of the currency
  */
 
 /**
