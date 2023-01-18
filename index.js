@@ -6,6 +6,8 @@ module.exports = require("./lib/@dashincubator/blocktx.js")
 
 // these typedef reexports will be available to dependent packages
 /**
+ * @typedef {import('./blocktx.js').TxPrivateKey} TxPrivateKey
+ * @typedef {import('./blocktx.js').TxPublicKey} TxPublicKey
  * @typedef {import('./blocktx.js').TxInput} TxInput
  * @typedef {import('./blocktx.js').TxInputRaw} TxInputRaw
  * @typedef {import('./blocktx.js').TxInputHashable} TxInputHashable
@@ -13,4 +15,5 @@ module.exports = require("./lib/@dashincubator/blocktx.js")
  * @typedef {import('./blocktx.js').TxOutput} TxOutput
  * @typedef {import('./blocktx.js').TxInfo} TxInfo
  * @typedef {import('./blocktx.js').TxDeps} TxDeps
+ * @typedef {import('./blocktx.js').TxSignOpts} TxSignOpts
  */

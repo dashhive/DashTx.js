@@ -92,17 +92,51 @@
   Tx.create = function (myUtils) {
     /**
      * @param {TxInfo} txInfo
-     * @param {TxDeps} [_myUtils]
+     * @param {Array<TxPrivateKey>} [keys]
      */
-    async function hashAndSignAll(txInfo, _myUtils) {
-      if (!_myUtils) {
-        _myUtils = myUtils;
+    async function hashAndSignAll(txInfo, keys) {
+      let _myUtils = myUtils;
+      if (keys) {
+        if (keys.length !== txInfo.inputs.length) {
+          throw new Error(
+            `number of 'keys' must match number of 'inputs' - each 'utxo' of the provided private key must be matched to that private key`,
+          );
+        }
+        _myUtils = Tx._createKeyUtils(myUtils, keys);
       }
-      return await Tx._hashAndSignAll(txInfo, myUtils);
+
+      return await Tx._hashAndSignAll(txInfo, _myUtils);
     }
 
     return {
       hashAndSignAll: hashAndSignAll,
+    };
+  };
+
+  /**
+   * @param {TxDeps} myUtils
+   * @param {Array<TxPrivateKey>} keys
+   */
+  Tx._createKeyUtils = function (myUtils, keys) {
+    return {
+      /** @type {TxGetPrivateKey} */
+      getPrivateKey: async function (_, i) {
+        let privKey = keys[i];
+        return privKey;
+      },
+      /** @type {TxGetPublicKey} */
+      getPublicKey: async function (txInput, i, txInputs) {
+        if (myUtils.getPublicKey) {
+          return await myUtils.getPublicKey(txInput, i, txInputs);
+        }
+
+        let privKey = keys[i];
+        //@ts-ignore
+        let pubKeyHex = myUtils.toPublicKey(privKey);
+        let pubKey = Tx.utils.hexToU8(pubKeyHex);
+        return pubKey;
+      },
+      sign: myUtils.sign,
     };
   };
 
@@ -130,10 +164,11 @@
         return privKey;
       };
     }
+
     // temp shim
     if (!myUtils.getPublicKey) {
       myUtils.getPublicKey = async function (txInput, i, inputs) {
-        let privKey =await  myUtils.getPrivateKey(txInput, i, inputs);
+        let privKey = await myUtils.getPrivateKey(txInput, i, inputs);
         let pubKeyHex = await myUtils.toPublicKey(privKey);
         let pubKey = Tx.utils.hexToU8(pubKeyHex);
         return pubKey;
@@ -144,8 +179,10 @@
       let txInput = txInfo.inputs[i];
       // TODO script -> lockScript, sigScript
       //let lockScriptHex = txInput.script;
+      let _sigHashType = txInput.sigHashType ?? sigHashType;
       let txHashable = Tx.createHashable(txInfo, i);
-      let txHashBuf = await Tx.hashPartial(txHashable, txInput.sigHashType);
+      let txHashBuf = await Tx.hashPartial(txHashable, _sigHashType);
+      //@ts-ignore
       let privKey = await myUtils.getPrivateKey(txInput, i, txInfo.inputs);
 
       let sigHex = await myUtils.sign({
@@ -155,11 +192,11 @@
 
       let pubKeyHex = txInput.publicKey;
       if (!pubKeyHex) {
+        //@ts-ignore
         let pubKey = await myUtils.getPublicKey(txInput, i, txInfo.inputs);
         pubKeyHex = Tx.utils.u8ToHex(pubKey);
       }
 
-      let _sigHashType = txInput.sigHashType ?? sigHashType;
       let txInputSigned = {
         txId: txInput.txId,
         outputIndex: txInput.outputIndex,
@@ -174,7 +211,7 @@
       txInput._signature = sigHex.toString();
       txInput._lockScript = txInfo.inputs[i].script;
       txInput._publicKey = pubKeyHex.toString();
-      txInput._sigHashType = sigHashType;
+      txInput._sigHashType = _sigHashType;
 
       txInfoSigned.inputs[i] = txInputSigned;
     }
@@ -201,16 +238,8 @@
     opts = Object.assign({}, opts);
     opts.inputs = opts.inputs.map(function (input) {
       return {
-        txId:
-          input.txId ??
-          //@ts-ignore
-          input.txid,
-        outputIndex:
-          input.outputIndex ??
-          //@ts-ignore
-          input.index ??
-          //@ts-ignore
-          input.vout,
+        txId: input.txId,
+        outputIndex: input.outputIndex,
       };
     });
 
@@ -263,7 +292,7 @@
    * @param {Array<TxOutput>} opts.outputs
    * @param {Number} [opts.version]
    * @param {Boolean} [opts._debug] - bespoke debug output
-   * xparam {String} [opts.sigHashType] - hex, typically 01
+   * xparam {String} [opts.sigHashType] - hex, typically 01 (ALL)
    */
   Tx.createSigned = function (opts) {
     let hex = Tx._create(opts);
@@ -273,6 +302,7 @@
   /**
    * @param {Object} opts
    * @param {Array<TxInputRaw|TxInputHashable|TxInputSigned>} opts.inputs
+   * @param {Number} [opts.locktime]
    * @param {Array<TxOutput>} opts.outputs
    * @param {Number} [opts.version]
    * @param {Boolean} [opts._debug] - bespoke debug output
@@ -280,7 +310,7 @@
   Tx._create = function ({
     version = VERSION,
     inputs,
-    locktime = 0,
+    locktime = 0x0,
     outputs,
     /* maxFee = 10000, */
     _debug = false,
@@ -300,25 +330,25 @@
     inputs.forEach(function (input) {
       let inputHex = [];
       //@ts-ignore
-      let txid = input.txid ?? input.txId;
+      let txId = input.txId;
 
-      if (!txid) {
+      if (!txId) {
         throw new Error("missing required utxo property 'txid'");
       }
 
-      if (64 !== txid.length) {
+      if (64 !== txId.length) {
         throw new Error(
-          `expected uxto property 'txid' to be a valid 64-character (32-byte) hex string, but got '${txid}' (size ${txid.length})`,
+          `expected uxto property 'txId' to be a valid 64-character (32-byte) hex string, but got '${txId}' (size ${txId.length})`,
         );
       }
 
-      assertHex(txid, "txid");
+      assertHex(txId, "txId");
 
-      let reverseTxid = Tx.utils.reverseHex(txid);
-      inputHex.push(reverseTxid);
+      let reverseTxId = Tx.utils.reverseHex(txId);
+      inputHex.push(reverseTxId);
 
       //@ts-ignore
-      let voutIndex = input.outputIndex ?? input.index ?? input.vout;
+      let voutIndex = input.outputIndex;
       if (isNaN(voutIndex)) {
         throw new Error(
           "expected utxo property'vout' to be an integer representing this input's previous output index",
@@ -335,7 +365,7 @@
         let keySize = Tx.utils.toVarInt(input.publicKey.length / 2);
         let sigScript = `${sigSize}${sig}${keySize}${input.publicKey}`;
         let sigScriptLen = sigScript.length / 2;
-        let sigScriptLenSize = Tx.utils.toVarInt(sigScriptSize);
+        let sigScriptLenSize = Tx.utils.toVarInt(sigScriptLen);
         inputHex.push(sigScriptLenSize);
         inputHex.push(sigScript);
       } else if (input.script) {
@@ -703,6 +733,9 @@ b3 24 00 00 00 00 00 00 # satoshis
 */
 })(("undefined" !== typeof module && module.exports) || window);
 
+/** @typedef {Uint8Array} TxPrivateKey */
+/** @typedef {Uint8Array} TxPublicKey */
+
 /**
  * @typedef TxInput
  * @prop {String} txId - hex (not pre-reversed)
@@ -728,7 +761,7 @@ b3 24 00 00 00 00 00 00 # satoshis
  * @prop {String} [script] - the previous lock script (default: derived from public key as p2pkh)
  * @prop {String} [publicKey] - hex-encoded public key (typically starts with a 0x02 or 0x03 prefix)
  * @prop {String} [pubKeyHash] - the 20-byte pubKeyHash (address without magic byte or checksum)
- * @prop {Number} sigHashType - typically 0x01 (SIGHASH_ALL)
+ * @prop {Number} [sigHashType] - typically 0x01 (SIGHASH_ALL)
  */
 
 /**
@@ -744,7 +777,7 @@ b3 24 00 00 00 00 00 00 # satoshis
 /**
  * @typedef TxInfo
  * @prop {Array<TxInputHashable>} inputs
- * @prop {Number} locktime - 0 by default
+ * @prop {Number} [locktime] - 0 by default
  * @prop {Array<TxOutput>} outputs
  * @prop {Number} [version]
  * @prop {String} [transaction] - signed transaction hex
@@ -761,12 +794,15 @@ b3 24 00 00 00 00 00 00 # satoshis
 
 /**
  * @callback TxSign
- * @param {TxInfo} txInfo
+ * @param {TxSignOpts} opts
  * @returns {TxInfo}
+ *
+ * @typedef TxSignOpts
+ * @prop {TxPrivateKey} opts.privateKey
+ * @prop {Uint8Array} opts.hash
  */
 
 /**
- * deprecated
  * @callback TxToPublicKey
  * @param {Uint8Array} privateKey
  * @returns {String} - public key hex
