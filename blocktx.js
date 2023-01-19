@@ -68,10 +68,11 @@
     25; // lockscript
 
   /**
+   * Calculates the minimum fee (<= 25% likely to be correct) and maximum lowest possible fee.
    * @param {TxInfo} txInfo
-   * @returns {[Number, Number]}
+   * @returns {[Number, Number]} - min and max fees
    */
-  Tx.estimate = function (txInfo) {
+  Tx.estimates = function (txInfo) {
     let size = Tx._HEADER_ONLY_SIZE;
 
     size += Tx.utils.toVarIntSize(txInfo.inputs.length);
@@ -83,13 +84,29 @@
     let maxPadding = Tx.MAX_INPUT_PAD * txInfo.inputs.length;
     let maxSize = size + maxPadding;
 
+    // TODO return median
     return [size, maxSize];
+  };
+
+  /**
+   * Calculates the median fee, which is 75% likely to be correct
+   * @param {TxInfo} txInfo
+   * @returns {Number}
+   */
+  Tx.estimate = function (txInfo) {
+    let [minFee, maxFee] = Tx.estimates(txInfo);
+    let feeSpread = maxFee - minFee;
+    let halfFeeSpread = Math.ceil(feeSpread / 2);
+    let medianFee = minFee + halfFeeSpread;
+    return medianFee;
   };
 
   /**
    * @param {TxDeps} myUtils
    */
   Tx.create = function (myUtils) {
+    myUtils = Object.assign({}, Tx.utils, myUtils);
+
     /**
      * @param {TxInfo} txInfo
      * @param {Array<TxPrivateKey>} [keys]
@@ -108,9 +125,11 @@
       return await Tx._hashAndSignAll(txInfo, _myUtils);
     }
 
-    return {
+    let txInst = {
+      _utils: myUtils,
       hashAndSignAll: hashAndSignAll,
     };
+    return txInst;
   };
 
   /**
@@ -118,26 +137,35 @@
    * @param {Array<TxPrivateKey>} keys
    */
   Tx._createKeyUtils = function (myUtils, keys) {
-    return {
+    let _getPublicKey = myUtils.getPublicKey || getPublicKey;
+    let _utils = {
       /** @type {TxGetPrivateKey} */
       getPrivateKey: async function (_, i) {
         let privKey = keys[i];
         return privKey;
       },
       /** @type {TxGetPublicKey} */
-      getPublicKey: async function (txInput, i, txInputs) {
-        if (myUtils.getPublicKey) {
-          return await myUtils.getPublicKey(txInput, i, txInputs);
-        }
-
-        let privKey = keys[i];
-        //@ts-ignore
-        let pubKeyHex = myUtils.toPublicKey(privKey);
-        let pubKey = Tx.utils.hexToU8(pubKeyHex);
-        return pubKey;
-      },
+      getPublicKey: _getPublicKey,
       sign: myUtils.sign,
     };
+
+    /** @type {TxGetPublicKey} */
+    async function getPublicKey(txInput, i, txInputs) {
+      let privKey = keys[i];
+      //@ts-ignore
+      let pubKey = myUtils.toPublicKey(privKey);
+      if ("string" === typeof pubKey) {
+        console.warn(
+          "oops, you gave a publicKey as hex (deprecated) rather than a buffer",
+        );
+        //@ts-ignore
+        pubKey = Tx.utils.hexToU8(pubKey);
+      }
+      //@ts-ignore
+      return pubKey;
+    }
+
+    return Object.assign(_utils, myUtils);
   };
 
   /**
@@ -159,18 +187,38 @@
 
     // temp shim
     if (!myUtils.getPrivateKey) {
+      console.warn(`you must provide 'keys' or 'getPrivateKey()'`);
+      //@ts-ignore
+      if (!txInfo?.inputs?.[0]?.getPrivateKey) {
+        throw new Error("");
+      }
+      //@ts-ignore
       myUtils.getPrivateKey = async function (txInput) {
+        //@ts-ignore
         let privKey = await txInput.getPrivateKey();
         return privKey;
       };
     }
+    //@ts-ignore
+    if (txInfo?.inputs?.[0]?.getPrivateKey) {
+      console.warn(`deprecated use of 'txInput.getPrivateKey()'`);
+    }
 
     // temp shim
     if (!myUtils.getPublicKey) {
+      //@ts-ignore
       myUtils.getPublicKey = async function (txInput, i, inputs) {
+        //@ts-ignore
         let privKey = await myUtils.getPrivateKey(txInput, i, inputs);
-        let pubKeyHex = await myUtils.toPublicKey(privKey);
-        let pubKey = Tx.utils.hexToU8(pubKeyHex);
+        //@ts-ignore
+        let pubKey = await myUtils.toPublicKey(privKey);
+        if ("string" === typeof pubKey) {
+          console.warn(
+            "oops, you gave a publicKey as hex (deprecated) rather than a buffer",
+          );
+          //@ts-ignore
+          pubKey = Tx.utils.hexToU8(pubKey);
+        }
         return pubKey;
       };
     }
@@ -185,12 +233,22 @@
       //@ts-ignore
       let privKey = await myUtils.getPrivateKey(txInput, i, txInfo.inputs);
 
-      let sigHex = await myUtils.sign({
+      let sigBuf = await myUtils.sign({
         privateKey: privKey,
         hash: txHashBuf,
       });
+      let sigHex = Tx.utils.u8ToHex(sigBuf);
+      if ("string" === typeof sigBuf) {
+        console.warn(`sign() should return a Uint8Array of an ASN.1 signature`);
+        sigHex = sigBuf;
+      }
 
       let pubKeyHex = txInput.publicKey;
+      if ("string" !== typeof pubKeyHex) {
+        console.warn(
+          `utxo inputs should be plain JSON and use hex rather than buffers for 'publicKey'`,
+        );
+      }
       if (!pubKeyHex) {
         //@ts-ignore
         let pubKey = await myUtils.getPublicKey(txInput, i, txInfo.inputs);
@@ -200,8 +258,8 @@
       let txInputSigned = {
         txId: txInput.txId,
         outputIndex: txInput.outputIndex,
-        signature: sigHex.toString(),
-        publicKey: pubKeyHex.toString(),
+        signature: sigHex,
+        publicKey: pubKeyHex,
         sigHashType: _sigHashType,
       };
 
@@ -210,7 +268,7 @@
       txInput._hash = txHashHex;
       txInput._signature = sigHex.toString();
       txInput._lockScript = txInfo.inputs[i].script;
-      txInput._publicKey = pubKeyHex.toString();
+      txInput._publicKey = pubKeyHex;
       txInput._sigHashType = _sigHashType;
 
       txInfoSigned.inputs[i] = txInputSigned;
@@ -314,6 +372,7 @@
     outputs,
     /* maxFee = 10000, */
     _debug = false,
+    _DANGER_donate = false,
   }) {
     let sep = "";
     if (_debug) {
@@ -391,14 +450,27 @@
     tx.push(nOutputs);
 
     if (!outputs.length) {
-      throw new Error(
-        `'outputs' list cannot empty (length 0) - TODO add a 'donate: true' option`,
-      );
+      if (!_DANGER_donate) {
+        throw new Error(
+          `'outputs' list must not be empty - use the developer debug option '_DANGER_donate: true' to bypass`,
+        );
+      }
     }
     outputs.forEach(function (output, i) {
+      if (!output.satoshis) {
+        throw new Error(`every output must have 'satoshis'`);
+      }
       let satoshis = toUint64LE(output.satoshis);
       tx.push(satoshis);
 
+      if (!output.pubKeyHash) {
+        if (!output.address) {
+          throw new Error(
+            `every output must have 'pubKeyHash' (or 'address' if base58check is loaded)`,
+          );
+        }
+        output.pubKeyHash = Tx.utils.addrToPubKeyHash(output.address);
+      }
       assertHex(output.pubKeyHash, `output[${i}].pubKeyHash`);
       let lockScript = `${PKH_SCRIPT_SIZE}${OP_DUP}${OP_HASH160}${PKH_SIZE}${output.pubKeyHash}${OP_EQUALVERIFY}${OP_CHECKSIG}`;
       tx.push(lockScript);
@@ -499,6 +571,48 @@
       }
     }
   }
+
+  /**
+   * @param {String} addr
+   * @returns {String} - pubKeyHash in the raw (hex)
+   */
+  Tx.utils.addrToPubKeyHash = function (addr) {
+    let Base58Check = require("@dashincubator/base58check").Base58Check;
+    let b58c = Base58Check.create({
+      pubKeyHashVersion: "4c",
+      privateKeyVersion: "cc",
+    });
+
+    // XXX bad idea?
+    // using .decode to avoid the async of .verify
+    let parts = b58c.decode(addr);
+    return parts.pubKeyHash;
+  };
+
+  /** @type TxSign */
+  Tx.utils.sign = async function signTx({ privateKey, hash }) {
+    let Secp256k1 =
+      //@ts-ignore
+      exports.nobleSecp256k1 || require("@dashincubator/secp256k1");
+
+    let sigOpts = { canonical: true };
+    let sigBuf = await Secp256k1.sign(hash, privateKey, sigOpts);
+    return sigBuf;
+  };
+
+  /**
+   * @param {Uint8Array} privateKey
+   * @returns {String} - pubKeyHash in the raw (hex)
+   */
+  Tx.utils.toPublicKey = function (privateKey) {
+    let Secp256k1 =
+      //@ts-ignore
+      exports.nobleSecp256k1 || require("@dashincubator/secp256k1");
+
+    let isCompressed = true;
+    let pubKeyBuf = Secp256k1.getPublicKey(privateKey, isCompressed);
+    return pubKeyBuf;
+  };
 
   /**
    * Caution: JS can't handle 64-bit ints
@@ -770,7 +884,8 @@ b3 24 00 00 00 00 00 00 # satoshis
 
 /**
  * @typedef TxOutput
- * @prop {String} pubKeyHash - payaddr's raw hex value (decoded, not Base58Check)
+ * @prop {String} [address] - payAddr as Base58Check (human-friendly)
+ * @prop {String} [pubKeyHash] - payAddr's raw hex value (decoded, not Base58Check)
  * @prop {Number} satoshis - the number of smallest units of the currency
  */
 
@@ -795,7 +910,7 @@ b3 24 00 00 00 00 00 00 # satoshis
 /**
  * @callback TxSign
  * @param {TxSignOpts} opts
- * @returns {TxInfo}
+ * @returns {Uint8Array}
  *
  * @typedef TxSignOpts
  * @prop {TxPrivateKey} opts.privateKey
@@ -805,7 +920,7 @@ b3 24 00 00 00 00 00 00 # satoshis
 /**
  * @callback TxToPublicKey
  * @param {Uint8Array} privateKey
- * @returns {String} - public key hex
+ * @returns {Uint8Array} - public key hex
  */
 
 /**

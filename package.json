@@ -35,8 +35,8 @@
     "url": "https://github.com/dashhive/blocktx.js/issues"
   },
   "homepage": "https://github.com/dashhive/blocktx.js#readme",
-  "dependencies": {},
   "devDependencies": {
+    "@dashincubator/base58check": "^1.3.1",
     "@dashincubator/secp256k1": "^1.7.1-1"
   }
 }
