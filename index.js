@@ -14,6 +14,7 @@ module.exports = require("./lib/@dashincubator/blocktx.js")
  * @typedef {import('./blocktx.js').TxInputSigned} TxInputSigned
  * @typedef {import('./blocktx.js').TxOutput} TxOutput
  * @typedef {import('./blocktx.js').TxInfo} TxInfo
+ * @typedef {import('./blocktx.js').TxInfoSigned} TxInfoSigned
  * @typedef {import('./blocktx.js').TxDeps} TxDeps
  * @typedef {import('./blocktx.js').TxSignOpts} TxSignOpts
  */

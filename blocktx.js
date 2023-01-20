@@ -868,12 +868,14 @@ b3 24 00 00 00 00 00 00 # satoshis
 
 /**
  * @typedef TxInputRaw
+ * @prop {String} [address] - BaseCheck58-encoded pubKeyHash
  * @prop {String} txId - hex (not pre-reversed)
  * @prop {Number} outputIndex - index in previous tx's output (vout index)
  */
 
 /**
  * @typedef TxInputHashable
+ * @prop {String} [address] - BaseCheck58-encoded pubKeyHash
  * @prop {String} txId - hex (not pre-reversed)
  * @prop {Number} outputIndex - index in previous tx's output (vout index)
  * @prop {String} [signature] - (included as type hack)
