@@ -175,6 +175,7 @@
    * TODO _param {Number} [txInfo.version]
    * TODO _param {Boolean} [txInfo._debug] - bespoke debug output
    * @param {TxDeps} myUtils
+   * @returns {Promise<TxInfoSigned>}
    */
   Tx._hashAndSignAll = async function (txInfo, myUtils) {
     let sigHashType = 0x01;
@@ -244,15 +245,18 @@
       }
 
       let pubKeyHex = txInput.publicKey;
-      if ("string" !== typeof pubKeyHex) {
-        console.warn(
-          `utxo inputs should be plain JSON and use hex rather than buffers for 'publicKey'`,
-        );
-      }
       if (!pubKeyHex) {
         //@ts-ignore
         let pubKey = await myUtils.getPublicKey(txInput, i, txInfo.inputs);
         pubKeyHex = Tx.utils.u8ToHex(pubKey);
+      }
+      if ("string" !== typeof pubKeyHex) {
+        let warn = new Error("stack");
+        console.warn(
+          `utxo inputs should be plain JSON and use hex rather than buffers for 'publicKey'`,
+          warn.stack,
+        );
+        pubKeyHex = Tx.utils.u8ToHex(pubKeyHex);
       }
 
       let txInputSigned = {
@@ -852,6 +856,7 @@ b3 24 00 00 00 00 00 00 # satoshis
 
 /**
  * @typedef TxInput
+ * @prop {String} [address] - BaseCheck58-encoded pubKeyHash
  * @prop {String} txId - hex (not pre-reversed)
  * @prop {Number} outputIndex - index in previous tx's output (vout index)
  * @prop {String} signature - hex-encoded ASN.1 (DER) signature (starts with 0x30440220 or  0x30440221)
@@ -896,6 +901,16 @@ b3 24 00 00 00 00 00 00 # satoshis
  * @prop {Array<TxOutput>} outputs
  * @prop {Number} [version]
  * @prop {String} [transaction] - signed transaction hex
+ * @prop {Boolean} [_debug] - bespoke debug output
+ */
+
+/**
+ * @typedef TxInfoSigned
+ * @prop {Array<TxInputSigned>} inputs
+ * @prop {Number} locktime - 0 by default
+ * @prop {Array<TxOutput>} outputs
+ * @prop {Number} version
+ * @prop {String} transaction - signed transaction hex
  * @prop {Boolean} [_debug] - bespoke debug output
  */
 
