@@ -25,7 +25,7 @@ Server and browser compatible. Vanilla JS. 0 Dependencies.
 npm install --save dashtx
 ```
 
-Note: You must provide your own `sign()` function, as shown above.
+Note: You may provide your own `sign()` function, as shown above.
 
 ```js
 "use strict";
@@ -315,9 +315,9 @@ Tx.create({ sign });
  * @param {Uint8Array} hash - the (not reversed) 2x-sha256-hash
  * @returns {String} - hex representation of an ASN.1 signature
  */
-async function sign({ privateKey, hash }) {
+async function sign(privateKey, txHashBuf) {
   let sigOpts = { canonical: true };
-  let sigBuf = await Secp256k1.sign(hash, privateKey, sigOpts);
+  let sigBuf = await Secp256k1.sign(txHashBuf, privateKey, sigOpts);
 
   return Tx.utils.u8ToHex(sigBuf);
 }

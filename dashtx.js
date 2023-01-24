@@ -253,10 +253,7 @@ var DashTx = ("object" === typeof module && exports) || {};
       //@ts-ignore
       let privKey = await myUtils.getPrivateKey(txInput, i, txInfo.inputs);
 
-      let sigBuf = await myUtils.sign({
-        privateKey: privKey,
-        hash: txHashBuf,
-      });
+      let sigBuf = await myUtils.sign(privKey, txHashBuf);
       let sigHex = Tx.utils.u8ToHex(sigBuf);
       if ("string" === typeof sigBuf) {
         console.warn(`sign() should return a Uint8Array of an ASN.1 signature`);
@@ -623,13 +620,13 @@ var DashTx = ("object" === typeof module && exports) || {};
   };
 
   /** @type TxSign */
-  TxUtils.sign = async function signTx({ privateKey, hash }) {
+  TxUtils.sign = async function signTx(privateKey, txHashBuf) {
     let Secp256k1 =
       //@ts-ignore
       exports.nobleSecp256k1 || require("@dashincubator/secp256k1");
 
     let sigOpts = { canonical: true };
-    let sigBuf = await Secp256k1.sign(hash, privateKey, sigOpts);
+    let sigBuf = await Secp256k1.sign(txHashBuf, privateKey, sigOpts);
     return sigBuf;
   };
 
@@ -965,14 +962,9 @@ if ("object" === typeof module) {
 
 /**
  * @callback TxSign
- * @param {TxSignOpts} opts
+ * @param {TxPrivateKey} opts
+ * @param {Uint8Array} txHashBuf - hex
  * @returns {TxSignature} - buf
- */
-
-/**
- * @typedef TxSignOpts - TODO change to positional params
- * @prop {TxPrivateKey} privateKey - buf
- * @prop {String} hash - hex
  */
 
 /**
