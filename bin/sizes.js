@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 "use strict";
 
-let BlockTx = require("../blocktx.js");
+let DashTx = require("../dashtx.js");
 
-console.info("HEADER SIZE:", BlockTx.HEADER_SIZE);
-console.info("MIN INPUT SIZE:", BlockTx.MIN_INPUT_SIZE);
-console.info("PAD INPUT SIZE:", BlockTx.MAX_INPUT_PAD);
-console.info("MAX INPUT SIZE:", BlockTx.MAX_INPUT_SIZE);
-console.info("OUTPUT SIZE:", BlockTx.OUTPUT_SIZE);
+console.info("HEADER SIZE:", DashTx.HEADER_SIZE);
+console.info("MIN INPUT SIZE:", DashTx.MIN_INPUT_SIZE);
+console.info("PAD INPUT SIZE:", DashTx.MAX_INPUT_PAD);
+console.info("MAX INPUT SIZE:", DashTx.MAX_INPUT_SIZE);
+console.info("OUTPUT SIZE:", DashTx.OUTPUT_SIZE);

@@ -1,4 +1,4 @@
-# [@dashincubator/blocktx](https://github.com/dashhive/blocktx.js)
+# [dashtx](https://github.com/dashhive/dashtx.js)
 
 Create a transaction for a crypto-currency network. \
 (Bitcoin, BTC, BSV, BCH, DASH, Doge, etc)
@@ -22,7 +22,7 @@ Server and browser compatible. Vanilla JS. 0 Dependencies.
 ### Bun, Deno, Node, WebPack, Vite
 
 ```sh
-npm install --save @dashincubator/blocktx
+npm install --save dashtx
 ```
 
 Note: You must provide your own `sign()` function, as shown above.
@@ -30,7 +30,7 @@ Note: You must provide your own `sign()` function, as shown above.
 ```js
 "use strict";
 
-let Tx = require("@dashincubator/blocktx");
+let Tx = require("dashtx");
 let tx = Tx.create({ sign: sign });
 
 let Secp256k1 = require("@dashincubator/secp256k1");
@@ -48,7 +48,7 @@ async function sign({ privateKey, hash }) {
 
 ```html
 <script src="https://unpkg.com/@dashincubator/secp256k1/secp256k1.js"></script>
-<script src="https://unpkg.com/@dashincubator/blocktx/blocktx.js"></script>
+<script src="https://unpkg.com/dashtx/dashtx.js"></script>
 ```
 
 Note: You must provide your own `sign()` function, as shown below.
@@ -57,7 +57,7 @@ Note: You must provide your own `sign()` function, as shown below.
 (function () {
   "use strict";
 
-  let Tx = window.BlockTx;
+  let Tx = window.DashTx;
   let tx = Tx.create({ sign: sign });
 
   let Secp256k1 = window.nobleSecp256k1;
@@ -212,10 +212,12 @@ Tx.OUTPUT_SIZE         //  34
 Tx.create({ sign });
 
 /**
- * Estimates the min and max fees for a transaction.
+ * Estimates the min, mid, and max sizes of (fees for) a transaction.
+ * (if in doubt, start with the mid - its's 75% likely to match the signed size)
+ * (non-deterministic because signed size is based on the variable-size signature)
  */
-Tx.estimate({ inputs, outputs });
-// [191, 193]
+Tx.appraise({ inputs, outputs });
+// { min: 191, mid: 192, max: 193 }
 
 /**
  * Creates the variety of required hashable transactions
@@ -339,16 +341,16 @@ XdRgbwH1LEfFQUVY2DnmsVxfo33CRDhydj
 ## Anatomy of a Blockchain Transaction
 
 See
-[Anatomy of a Blockchain Transaction](https://github.com/dashhive/blocktx.js/issues/1).
+[Anatomy of a Blockchain Transaction](https://github.com/dashhive/dashtx.js/issues/1).
 
 ## CLI Debugger
 
 ```sh
-npm install --location=global @dashincubator/blocktx
+npm install --location=global dashtx
 ```
 
 ```sh
-blocktx-inspect ./tx.hex
+dashtx-inspect ./tx.hex
 ```
 
 ```txt

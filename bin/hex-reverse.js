@@ -8,7 +8,7 @@ if (!hex) {
   process.exit(1);
 }
 
-let Tx = require("../blocktx.js");
+let Tx = require("../dashtx.js");
 let reversed = Tx.utils.reverseHex(hex);
 
 console.info(reversed);

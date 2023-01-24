@@ -5,17 +5,17 @@
   "main": "dashtx.js",
   "files": [
     "index.js",
-    "blocktx.js",
+    "dashtx.js",
     "./lib/",
     "./shims/"
   ],
   "browser": {
-    "index.js": "blocktx.js",
+    "index.js": "dashtx.js",
     "./shims/node-crypto.js": "./shims/browser-crypto.js",
     "crypto": false
   },
   "bin": {
-    "blocktx-inspect": "./bin/inspect.js"
+    "dashtx-inspect": "./bin/inspect.js"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -26,15 +26,15 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/dashhive/blocktx.js.git"
+    "url": "git+https://github.com/dashhive/dashtx.js.git"
   },
   "keywords": [],
   "author": "AJ ONeal <aj@therootcompany.com> (https://throotcompany.com/)",
   "license": "SEE LICENSE IN LICENSE",
   "bugs": {
-    "url": "https://github.com/dashhive/blocktx.js/issues"
+    "url": "https://github.com/dashhive/dashtx.js/issues"
   },
-  "homepage": "https://github.com/dashhive/blocktx.js#readme",
+  "homepage": "https://github.com/dashhive/dashtx.js#readme",
   "devDependencies": {
     "@dashincubator/base58check": "^1.3.1",
     "@dashincubator/secp256k1": "^1.7.1-1"

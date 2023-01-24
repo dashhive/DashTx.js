@@ -4,7 +4,7 @@
 
 let Fs = require("node:fs");
 
-let Tx = require("../blocktx.js");
+let Tx = require("../dashtx.js");
 
 let filepath = process.argv[2];
 
