@@ -625,7 +625,7 @@ var DashTx = ("object" === typeof module && exports) || {};
       //@ts-ignore
       exports.nobleSecp256k1 || require("@dashincubator/secp256k1");
 
-    let sigOpts = { canonical: true };
+    let sigOpts = { canonical: true, extraEntropy: true };
     let sigBuf = await Secp256k1.sign(txHashBuf, privateKey, sigOpts);
     return sigBuf;
   };

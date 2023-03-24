@@ -36,7 +36,7 @@ let tx = Tx.create({ sign: sign });
 let Secp256k1 = require("@dashincubator/secp256k1");
 
 async function sign({ privateKey, hash }) {
-  let sigOpts = { canonical: true };
+  let sigOpts = { canonical: true, extraEntropy: true };
   let sigBuf = await Secp256k1.sign(hash, privateKey, sigOpts);
   return Tx.utils.u8ToHex(sigBuf);
 }
@@ -63,7 +63,7 @@ Note: You must provide your own `sign()` function, as shown below.
   let Secp256k1 = window.nobleSecp256k1;
 
   async function sign({ privateKey, hash }) {
-    let sigOpts = { canonical: true };
+    let sigOpts = { canonical: true, extraEntropy: true };
     let sigBuf = await Secp256k1.sign(hash, privateKey, sigOpts);
     return Tx.utils.u8ToHex(sigBuf);
   }
