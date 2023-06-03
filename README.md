@@ -25,7 +25,7 @@ Server and browser compatible. Vanilla JS. 0 Dependencies.
 npm install --save dashtx
 ```
 
-Note: You may provide your own `sign()` function, as shown above.
+Note: You may provide your own `sign()` function, as shown below.
 
 ```js
 "use strict";
@@ -312,7 +312,7 @@ Tx.create({ sign });
  * We recommend @dashincubator/secp246k1 and @noble/secp246k1.
  *
  * @param {Uint8Array} privateKey - an input's corresponding key
- * @param {Uint8Array} hash - the (not reversed) 2x-sha256-hash
+ * @param {Uint8Array} txHashBuf - the (not reversed) 2x-sha256-hash
  * @returns {String} - hex representation of an ASN.1 signature
  */
 async function sign(privateKey, txHashBuf) {
