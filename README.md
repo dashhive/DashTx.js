@@ -96,7 +96,7 @@ let txInfo = {
   outputs: [
     {
       pubKeyHash: "1e0a6ef6085bb8af443a9e7f8941e61deb09fb54",
-      units: 5150,
+      satoshis: 5150,
     },
   ],
   locktime: 0,
@@ -139,7 +139,7 @@ let txInfo = {
     {
       // "XdRgbwH1LEfFQUVY2DnmsVxfo33CRDhydj"
       pubKeyHash: "1e0a6ef6085bb8af443a9e7f8941e61deb09fb54",
-      units: 5150,
+      satoshis: 5150,
     },
   ],
   locktime: 0,
@@ -175,7 +175,7 @@ console.info(txInfo.transaction);
   "outputs": [
     {
       "pubKeyHash": "1e0a6ef6085bb8af443a9e7f8941e61deb09fb54",
-      "units": 5150
+      "satoshis": 5150
     }
   ],
   "transaction": "030000...000000",
