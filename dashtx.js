@@ -1,5 +1,6 @@
 /**
  * @typedef Tx
+ * @prop {Number} SATOSHIS
  * @prop {Number} _HEADER_ONLY_SIZE
  * @prop {Number} HEADER_SIZE
  * @prop {Number} MIN_INPUT_SIZE - 147 each
@@ -7,6 +8,8 @@
  * @prop {Number} MAX_INPUT_SIZE - 149 each (with padding)
  * @prop {Number} OUTPUT_SIZE - 34 each
  * @prop {TxAppraise} appraise
+ * @prop {TxToDash} toDash
+ * @prop {TxToSats} toSats
  * @prop {TxCreate} create
  * @prop {TxCreateRaw} createRaw
  * @prop {TxCreateHashable} createHashable
@@ -55,6 +58,7 @@ var DashTx = ("object" === typeof module && exports) || {};
   let TxUtils = {};
 
   const VERSION = 3;
+  const SATOSHIS = 100000000;
 
   const MAX_U16 = Math.pow(2, 16) - 1;
   const MAX_U32 = Math.pow(2, 32) - 1;
@@ -81,6 +85,8 @@ var DashTx = ("object" === typeof module && exports) || {};
     "JavaScript 'Number's only go up to uint51, you must use 'BigInt' (ex: `let amount = 18014398509481984n`) for larger values";
   const E_TOO_BIG_INT =
     "JavaScript 'BigInt's are arbitrarily large, but you may only use up to UINT64 for transactions";
+
+  Tx.SATOSHIS = SATOSHIS;
 
   Tx._HEADER_ONLY_SIZE =
     4 + // version
@@ -135,6 +141,21 @@ var DashTx = ("object" === typeof module && exports) || {};
     let mid = min + halfSpread;
 
     return { min: min, mid: mid, max: max };
+  };
+
+  Tx.toDash = function (satoshis) {
+    let dashNum = satoshis / SATOSHIS;
+    let dashStr = dashNum.toFixed(8);
+    let floatBalance = parseFloat(dashStr);
+
+    return floatBalance;
+  };
+
+  Tx.toSats = function (dash) {
+    let sats = dash * SATOSHIS;
+    sats = Math.round(sats);
+
+    return sats;
   };
 
   Tx.create = function (myUtils) {
@@ -1017,6 +1038,18 @@ if ("object" === typeof module) {
  * @param {TxPrivateKey} privateKey
  * @param {Uint8Array} txHashBytes
  * @returns {TxSignature} - buf
+ */
+
+/**
+ * @callback TxToDash
+ * @param {Number} satoshis
+ * @returns {Number} - float
+ */
+
+/**
+ * @callback TxToSats
+ * @param {Number} dash - as float (decimal) DASH, not BigInt satoshis
+ * @returns {Number} - duffs
  */
 
 /**
