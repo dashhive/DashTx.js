@@ -8,6 +8,8 @@ let Tx = require("../dashtx.js");
 
 let filepath = process.argv[2];
 
+const OP_RETURN = 0x6a; // 106
+
 async function main() {
   let hasInputScript = false;
   let totalUnits = 0;
@@ -196,11 +198,38 @@ async function main() {
 
     let script = hex.substr(next, 2 * lockScriptSize);
     next += 2 * lockScriptSize;
-    console.info("   ", script.slice(0, 4), "                 # Script");
-    console.info("   ", script.slice(4, 6));
-    console.info("   ", script.slice(6, 26));
-    console.info("   ", script.slice(26, 46));
-    console.info("   ", script.slice(46, 50));
+
+    let scriptTypeHex = script.slice(0, 2);
+    let scriptType = parseInt(scriptTypeHex, 16);
+    if (OP_RETURN === scriptType) {
+      console.info(
+        "   ",
+        scriptTypeHex,
+        script.slice(2, 4),
+        "                # Memo (OP_RETURN)",
+      );
+      let memo = script.slice(4, 2 * lockScriptSize);
+      let decoder = new TextDecoder();
+      let bytes = hexToBytes(memo);
+      let msg = "";
+      try {
+        msg = decoder.decode(bytes);
+      } catch (e) {
+        msg = memo;
+      }
+      let chars = msg.split("");
+      for (; chars.length; ) {
+        let part = chars.splice(0, 20);
+        let str = part.join("");
+        console.info("   ", str);
+      }
+    } else {
+      console.info("   ", script.slice(0, 4), "                 # Script");
+      console.info("   ", script.slice(4, 6));
+      console.info("   ", script.slice(6, 26));
+      console.info("   ", script.slice(26, 46));
+      console.info("   ", script.slice(46, 50));
+    }
     console.info();
   }
 
@@ -242,6 +271,21 @@ async function main() {
   let txCost = txBytes + totalUnits;
   console.info(`Tx Min Cost:    ${txCost}`);
   console.info();
+}
+
+function hexToBytes(hex) {
+  let len = hex.length / 2;
+  let bytes = new Uint8Array(len);
+
+  let index = 0;
+  for (let i = 0; i < hex.length; i += 2) {
+    let c = hex.slice(i, i + 2);
+    let b = parseInt(c, 16);
+    bytes[index] = b;
+    index += 1;
+  }
+
+  return bytes;
 }
 
 main()
