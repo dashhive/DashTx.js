@@ -22,6 +22,7 @@ Server and browser compatible. Vanilla JS. 0 Dependencies.
 ### Bun, Deno, Node, WebPack, Vite
 
 ```sh
+npm install --save @dashincubator/secp256k1
 npm install --save dashtx
 ```
 
