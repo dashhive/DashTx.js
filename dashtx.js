@@ -506,7 +506,6 @@ var DashTx = ("object" === typeof module && exports) || {};
         throw new Error(`every output must have 'satoshis'`);
       }
       let satoshis = toUint64LE(output.satoshis);
-      console.log("[DEBUG] pay sats", output.satoshis, satoshis);
       tx.push(satoshis);
 
       if (!output.pubKeyHash) {
@@ -520,7 +519,6 @@ var DashTx = ("object" === typeof module && exports) || {};
       assertHex(output.pubKeyHash, `output[${i}].pubKeyHash`);
       let lockScript = `${PKH_SCRIPT_SIZE}${OP_DUP}${OP_HASH160}${PKH_SIZE}${output.pubKeyHash}${OP_EQUALVERIFY}${OP_CHECKSIG}`;
       tx.push(lockScript);
-      console.log("[DEBUG] pay lock", lockScript);
     });
 
     /**
@@ -530,7 +528,6 @@ var DashTx = ("object" === typeof module && exports) || {};
     function addMemo(tx, memoHex) {
       let satoshis = toUint64LE(0);
       tx.push(satoshis);
-      console.log("[DEBUG] memo sats", 0, satoshis);
 
       let memoSize = memoHex.length / 2;
       if (memoSize > 83) {
@@ -542,7 +539,6 @@ var DashTx = ("object" === typeof module && exports) || {};
       let memoSizeHex = TxUtils.toVarInt(memoSize);
       let lockScript = `${lockScriptSizeHex}${OP_RETURN}${memoSizeHex}${memoHex}`;
       tx.push(lockScript);
-      console.log("[DEBUG] memo lock", lockScript);
     }
 
     let locktimeHex = toUint32LE(locktime);
@@ -925,6 +921,7 @@ if ("object" === typeof module) {
 /**
  * @typedef TxInputRaw
  * @prop {String} [address] - BaseCheck58-encoded pubKeyHash
+ * @prop {Number} [satoshis] - for convenience
  * @prop {String} txId - hex (not pre-reversed)
  * @prop {Number} outputIndex - index in previous tx's output (vout index)
  */
