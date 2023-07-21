@@ -917,7 +917,7 @@ if ("object" === typeof module) {
  * @prop {String} [memo] - hex bytes of a memo (incompatible with pubKeyHash / address)
  * @prop {String} [address] - payAddr as Base58Check (human-friendly)
  * @prop {String} [pubKeyHash] - payAddr's raw hex value (decoded, not Base58Check)
- * @prop {Number} satoshis - the number of smallest units of the currency
+ * @prop {Number|BigInt} satoshis - the number of smallest units of the currency
  */
 
 // Func Defs
