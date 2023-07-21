@@ -205,6 +205,7 @@ var DashTx = ("object" === typeof module && exports) || {};
       /** @type {Array<TxInputHashable|TxInputSigned>} */
       inputs: [],
       outputs: txInfo.outputs,
+      _DANGER_donate: txInfo._DANGER_donate,
     };
 
     // temp shim
