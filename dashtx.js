@@ -66,6 +66,8 @@ var DashTx = ("object" === typeof module && exports) || {};
   const CH_A = 97;
   const CH_F = 102;
 
+  const OP_RETURN = "6a"; // 106
+
   const OP_DUP = "76";
   const OP_HASH160 = "a9";
   const OP_EQUALVERIFY = "88";
@@ -379,6 +381,7 @@ var DashTx = ("object" === typeof module && exports) || {};
       sep = "\n";
     }
 
+    /** @type Array<String> */
     let tx = [];
     let v = toUint32LE(version);
     tx.push(v);
@@ -457,6 +460,17 @@ var DashTx = ("object" === typeof module && exports) || {};
       }
     }
     outputs.forEach(function (output, i) {
+      if (output.memo) {
+        let invalid = output.satoshis || output.address || output.pubKeyHash;
+        if (invalid) {
+          throw new Error(
+            `memo outputs must not have 'satoshis', 'address', or 'pubKeyHash'`,
+          );
+        }
+        addMemo(tx, output.memo);
+        return;
+      }
+
       if (!output.satoshis) {
         throw new Error(`every output must have 'satoshis'`);
       }
@@ -476,6 +490,24 @@ var DashTx = ("object" === typeof module && exports) || {};
       tx.push(lockScript);
     });
 
+    /**
+     * @param {Array<String>} tx - the array of tx hex strings
+     * @param {String} memoHex - the memo bytes, in hex
+     */
+    function addMemo(tx, memoHex) {
+      let satoshis = toUint64LE(0);
+      tx.push(satoshis);
+
+      let memoSize = memoHex.length / 2;
+      if (memoSize > 32) {
+        throw new Error(`memos are limited to 83 bytes`);
+      }
+
+      let lockScriptSize = memoSize + 2;
+      let lockScript = `${lockScriptSize}${OP_RETURN}${memoSize}${memoHex}`;
+      tx.push(lockScript);
+    }
+
     let locktimeHex = toUint32LE(locktime);
     tx.push(locktimeHex);
 
@@ -492,10 +524,13 @@ var DashTx = ("object" === typeof module && exports) || {};
 
     let reverseU8 = new Uint8Array(hashU8.length);
     let reverseIndex = reverseU8.length - 1;
-    hashU8.forEach(function (b) {
-      reverseU8[reverseIndex] = b;
-      reverseIndex -= 1;
-    });
+    hashU8.forEach(
+      /** @param {Number} b */
+      function (b) {
+        reverseU8[reverseIndex] = b;
+        reverseIndex -= 1;
+      },
+    );
 
     //console.log("Reversed Round 2 Hash Buffer");
     //console.log(reverseU8);
@@ -863,6 +898,7 @@ if ("object" === typeof module) {
 
 /**
  * @typedef TxOutput
+ * @prop {String} [memo] - hex bytes of a memo (incompatible with pubKeyHash / address)
  * @prop {String} [address] - payAddr as Base58Check (human-friendly)
  * @prop {String} [pubKeyHash] - payAddr's raw hex value (decoded, not Base58Check)
  * @prop {Number} satoshis - the number of smallest units of the currency
