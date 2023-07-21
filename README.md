@@ -101,6 +101,7 @@ let txInfo = {
     {
       // OP_RETURN messages are supported
       memo: "Hello, Dash!",
+      satoshis: 0,
     },
   ],
   locktime: 0,
