@@ -98,6 +98,10 @@ let txInfo = {
       pubKeyHash: "1e0a6ef6085bb8af443a9e7f8941e61deb09fb54",
       satoshis: 5150,
     },
+    {
+      // OP_RETURN messages are supported
+      memo: "Hello, Dash!",
+    },
   ],
   locktime: 0,
 };
