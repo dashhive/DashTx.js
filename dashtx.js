@@ -67,6 +67,8 @@ var DashTx = ("object" === typeof module && exports) || {};
   const CH_F = 102;
 
   const OP_RETURN = "6a"; // 106
+  // Satoshis (64-bit) + lockscript size + OP_RETURN + Message Len
+  const OP_RETURN_HEADER_SIZE = 8 + 1 + 1 + 1;
 
   const OP_DUP = "76";
   const OP_HASH160 = "a9";
@@ -116,7 +118,14 @@ var DashTx = ("object" === typeof module && exports) || {};
     min += Tx.MIN_INPUT_SIZE * txInfo.inputs.length;
 
     min += Tx.utils.toVarIntSize(txInfo.outputs.length);
-    min += Tx.OUTPUT_SIZE * txInfo.outputs.length;
+    for (let output of txInfo.outputs) {
+      if (output.memo) {
+        let memoSize = output.memo.length / 2;
+        min += OP_RETURN_HEADER_SIZE + memoSize;
+        continue;
+      }
+      min += Tx.OUTPUT_SIZE;
+    }
 
     let maxPadding = Tx.MAX_INPUT_PAD * txInfo.inputs.length;
     let max = min + maxPadding;
@@ -476,6 +485,7 @@ var DashTx = ("object" === typeof module && exports) || {};
         throw new Error(`every output must have 'satoshis'`);
       }
       let satoshis = toUint64LE(output.satoshis);
+      console.log("[DEBUG] pay sats", output.satoshis, satoshis);
       tx.push(satoshis);
 
       if (!output.pubKeyHash) {
@@ -489,6 +499,7 @@ var DashTx = ("object" === typeof module && exports) || {};
       assertHex(output.pubKeyHash, `output[${i}].pubKeyHash`);
       let lockScript = `${PKH_SCRIPT_SIZE}${OP_DUP}${OP_HASH160}${PKH_SIZE}${output.pubKeyHash}${OP_EQUALVERIFY}${OP_CHECKSIG}`;
       tx.push(lockScript);
+      console.log("[DEBUG] pay lock", lockScript);
     });
 
     /**
@@ -498,15 +509,19 @@ var DashTx = ("object" === typeof module && exports) || {};
     function addMemo(tx, memoHex) {
       let satoshis = toUint64LE(0);
       tx.push(satoshis);
+      console.log("[DEBUG] memo sats", 0, satoshis);
 
       let memoSize = memoHex.length / 2;
-      if (memoSize > 32) {
+      if (memoSize > 83) {
         throw new Error(`memos are limited to 83 bytes`);
       }
 
       let lockScriptSize = memoSize + 2;
-      let lockScript = `${lockScriptSize}${OP_RETURN}${memoSize}${memoHex}`;
+      let lockScriptSizeHex = TxUtils.toVarInt(lockScriptSize);
+      let memoSizeHex = TxUtils.toVarInt(memoSize);
+      let lockScript = `${lockScriptSizeHex}${OP_RETURN}${memoSizeHex}${memoHex}`;
       tx.push(lockScript);
+      console.log("[DEBUG] memo lock", lockScript);
     }
 
     let locktimeHex = toUint32LE(locktime);
@@ -999,8 +1014,8 @@ if ("object" === typeof module) {
 
 /**
  * @callback TxSign
- * @param {TxPrivateKey} opts
- * @param {Uint8Array} txHashBuf - hex
+ * @param {TxPrivateKey} privateKey
+ * @param {Uint8Array} txHashBytes
  * @returns {TxSignature} - buf
  */
 
