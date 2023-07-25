@@ -751,6 +751,15 @@ var DashTx = ("object" === typeof module && exports) || {};
           `'outputs' list must not be empty - use the developer debug option '_DANGER_donate: true' to bypass`,
         );
       }
+
+      let gifts = ["💸", "🎁", "🧧"];
+      let indexIsh = Math.random() * 3;
+      let index = Math.floor(indexIsh);
+
+      outputs.push({
+        satoshis: 0,
+        memo: gifts[index],
+      });
     }
 
     for (let i = 0; i < outputs.length; i += 1) {
