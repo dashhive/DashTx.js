@@ -6,12 +6,10 @@
   "files": [
     "index.js",
     "dashtx.js",
-    "./lib/",
-    "./shims/"
+    "./lib/"
   ],
   "browser": {
     "index.js": "dashtx.js",
-    "./shims/node-crypto.js": "./shims/browser-crypto.js",
     "crypto": false
   },
   "bin": {
