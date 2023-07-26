@@ -53,7 +53,7 @@ var DashTx = ("object" === typeof module && exports) || {};
   "use strict";
 
   //@ts-ignore
-  let Crypto = window.crypto || require("node:crypto");
+  let Crypto = globalThis.crypto;
 
   let TxUtils = {};
 
