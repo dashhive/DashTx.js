@@ -16,7 +16,7 @@
     "dashtx-inspect": "./bin/inspect.js"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "npx -p pta@1 -- pta 'tests/**/*.js'",
     "bump": "npm version -m \"chore(release): bump to v%s\"",
     "fmt": "npx -p prettier@2.x -- prettier -w '**/*.{js,md}'",
     "lint": "npx -p typescript@4.x -- tsc -p ./jsconfig.json",

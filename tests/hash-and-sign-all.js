@@ -1,8 +1,8 @@
 "use strict";
 
-/** @typedef {import('./blocktx.js').TxInputHashable} TxInputHashable */
-/** @typedef {import('./blocktx.js').TxInputSigned} TxInputSigned */
-let Tx = require("./blocktx.js");
+/** @typedef {import('../dashtx.js').TxInputHashable} TxInputHashable */
+/** @typedef {import('../dashtx.js').TxInputSigned} TxInputSigned */
+let Tx = require("../dashtx.js");
 
 //@ts-ignore
 let Secp256k1 = exports.nobleSecp256k1 || require("@dashincubator/secp256k1");
@@ -45,47 +45,42 @@ let txInfo = {
       outputIndex: 0,
       script: prevLockScript,
       sigHashType: sigHashType,
-      getPrivateKey: function () {
-        return Tx.utils.hexToU8(privKeyHex);
-      },
     },
     {
       txId: txId,
       outputIndex: 1,
       script: prevLockScript,
       sigHashType: sigHashType,
-      getPrivateKey: function () {
-        return Tx.utils.hexToU8(privKeyHex);
-      },
     },
   ],
   outputs: [
     {
       pubKeyHash: "5bcd0d776a7252310b9f1a7eee1a749d42126944",
       //pubKeyHash: "1e0a6ef6085bb8af443a9e7f8941e61deb09fb54",
-      units: splitValue,
+      satoshis: splitValue,
     },
     {
       // for Xj4E...
       pubKeyHash: "5bcd0d776a7252310b9f1a7eee1a749d42126944",
       // for XdRg...
       //pubKeyHash: "1e0a6ef6085bb8af443a9e7f8941e61deb09fb54",
-      units: splitValue,
+      satoshis: splitValue,
     },
   ],
   locktime: 0,
 };
+let privKey = Tx.utils.hexToU8(privKeyHex);
+//let keys = [key, key];
 
 let tx = Tx.create({
   // required
-  sign: async function ({ privateKey, hash }) {
+  sign: async function (privateKey, hash) {
     let sigBuf = await Secp256k1.sign(hash, privateKey, {
       canonical: true,
     });
     return sigBuf;
   },
   getPrivateKey: async function (txInput) {
-    let privKey = txInput.getPrivateKey();
     return privKey;
   },
   // convenience
@@ -100,7 +95,7 @@ let tx = Tx.create({
   addressToPubKeyHash: function () {},
 });
 
-tx.hashAndSignAll(txInfo)
+tx.hashAndSignAll(txInfo /*, keys*/)
   .then(function (txInfoSigned) {
     console.error();
     console.error(txInfoSigned);
