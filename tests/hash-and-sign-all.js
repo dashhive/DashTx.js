@@ -106,7 +106,7 @@ Zora.test("reproduce known rawtx", async function (t) {
   await tx
     .hashAndSignAll(txInfo /*, keys*/)
     .then(function (txInfoSigned) {
-      t.equal(rawtx, txInfoSigned.transaction);
+      t.equal(txInfoSigned.transaction, rawtx);
     })
     .catch(function (err) {
       t.ok(false, err.message);

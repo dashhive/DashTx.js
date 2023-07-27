@@ -2,9 +2,22 @@
 
 let Zora = require("zora");
 
-let DashTx = require("../dashtx.js");
+let Secp256k1 = require("@dashincubator/secp256k1");
 
-Zora.test("memo lengths", async function (t) {
+let DashTx = require("../dashtx.js");
+let dashTx = DashTx.create({
+  sign: async function (privateKey, hash) {
+    let sigOpts = {
+      canonical: true,
+      // ONLY FOR TESTING: use deterministic signature (rather than random)
+      extraEntropy: null,
+    };
+    let sigBuf = await Secp256k1.sign(hash, privateKey, sigOpts);
+    return sigBuf;
+  },
+});
+
+Zora.test("memo lengths", function (t) {
   let memo1 = "ff";
   let memo75 = "ee".repeat(75);
   let memo76 = "dd".repeat(76);
@@ -28,41 +41,39 @@ Zora.test("memo lengths", async function (t) {
 
   t.throws(
     function () {
-      DashTx._addMemo([], memo81);
+      DashTx._createMemoScript(memo81);
     },
     /\b80 bytes\b/,
     "memo > 80 bytes should throw an error",
   );
 
-  let tx1a = ["0000000000000000", `${size3}6a${size1}${memo1}`];
-  let tx1 = [];
-  DashTx._addMemo(tx1, memo1);
-  t.deepEqual(tx1, tx1a, "single-byte memo fits");
+  let tx1 = DashTx._createMemoScript(memo1);
+  let tx1a = `0000000000000000${size3}6a${size1}${memo1}`;
+  let tx1b = tx1.join("");
+  t.deepEqual(tx1b, tx1a, "single-byte memo fits");
 
-  let tx75a = ["0000000000000000", `${size77}6a${size75}${memo75}`];
-  let tx75 = [];
-  DashTx._addMemo(tx75, memo75);
-  t.deepEqual(tx75, tx75a, "75-byte memo fits");
+  let tx75 = DashTx._createMemoScript(memo75);
+  let tx75a = `0000000000000000${size77}6a${size75}${memo75}`;
+  let tx75b = tx75.join("");
+  t.deepEqual(tx75b, tx75a, "75-byte memo fits");
 
-  let tx76a = ["0000000000000000", `${size79}6a${OP_PD1}${size76}${memo76}`];
-  let tx76 = [];
-  DashTx._addMemo(tx76, memo76);
-  t.deepEqual(tx76, tx76a, "76-byte memo fits with OP_PUSHDATA1");
+  let tx76a = `0000000000000000${size79}6a${OP_PD1}${size76}${memo76}`;
+  let tx76 = DashTx._createMemoScript(memo76);
+  let tx76b = tx76.join("");
+  t.deepEqual(tx76b, tx76a, "76-byte memo fits with OP_PUSHDATA1");
 
-  let tx77a = ["0000000000000000", `${size80}6a${OP_PD1}${size77}${memo77}`];
-  let tx77 = [];
-  DashTx._addMemo(tx77, memo77);
-  t.deepEqual(tx77, tx77a, "77-byte memo fits with OP_PUSHDATA1");
+  let tx77a = `0000000000000000${size80}6a${OP_PD1}${size77}${memo77}`;
+  let tx77 = DashTx._createMemoScript(memo77);
+  let tx77b = tx77.join("");
+  t.deepEqual(tx77b, tx77a, "77-byte memo fits with OP_PUSHDATA1");
 
-  let tx80a = ["0000000000000000", `${size83}6a${OP_PD1}${size80}${memo80}`];
-  let tx80 = [];
-  DashTx._addMemo(tx80, memo80);
-  t.deepEqual(tx80, tx80a, "80-byte memo fits with OP_PUSHDATA1");
+  let tx80a = `0000000000000000${size83}6a${OP_PD1}${size80}${memo80}`;
+  let tx80 = DashTx._createMemoScript(memo80);
+  let tx80b = tx80.join("");
+  t.deepEqual(tx80b, tx80a, "80-byte memo fits with OP_PUSHDATA1");
 });
 
 Zora.test("can create memo tx", async function (t) {
-  let dashTx = DashTx.create({});
-
   let privKeyHex =
     "ba0863ae0c162d67ae68a7f1e9dfdb7e3c47a71d397e19d7442f1afef3928511";
   let pkh = "82754a9c935fbfcdda5995a32006a68a8156ee2b";
@@ -87,12 +98,13 @@ Zora.test("can create memo tx", async function (t) {
   let keys = [privKey];
   let txInfoSigned = await dashTx.hashAndSignAll(txInfo, keys);
 
-  t.ok(txInfoSigned.transaction, "created transaction with memo");
+  let rawtx =
+    "03000000017777777777777777777777777777777777777777777777777777777777777777000000006a4730440220404c24dd8fff16b226c4795093b49e1060039c687120a9aaeca65cf321c593e00220180b160b3b2e937f9f5b9a8658a55c7511926b4631c421813c659e4f22b29140012103f808bdec4293bf12441ec9a9e61bc3b264c78fcc5ad499ce5f0799f2874e6856ffffffff0200000000000000000e6a0c48656c6c6f2c204461736821484d0000000000001976a91482754a9c935fbfcdda5995a32006a68a8156ee2b88ac00000000";
+
+  t.equal(txInfoSigned.transaction, rawtx, "created transaction with memo");
 });
 
 Zora.test("can create donation tx via memo", async function (t) {
-  let dashTx = DashTx.create({});
-
   let privKeyHex =
     "ba0863ae0c162d67ae68a7f1e9dfdb7e3c47a71d397e19d7442f1afef3928511";
   let pkh = "82754a9c935fbfcdda5995a32006a68a8156ee2b";
@@ -114,6 +126,10 @@ Zora.test("can create donation tx via memo", async function (t) {
   let privKey = DashTx.utils.hexToBytes(privKeyHex);
   let keys = [privKey];
   let txInfoSigned = await dashTx.hashAndSignAll(txInfo, keys);
+  let txHex = txInfoSigned.transaction;
 
-  t.ok(txInfoSigned.transaction, "created donation transaction via memo");
+  let rawtx =
+    "03000000017777777777777777777777777777777777777777777777777777777777777777000000006b483045022100d2a13920c4002ee76df3cd3a0afcebb12e71871c63bb49ba379de6d709f488b60220627252f66903c3dfa69ba86a581c09342721a15d75e2a455a2dff09187e7668e012103f808bdec4293bf12441ec9a9e61bc3b264c78fcc5ad499ce5f0799f2874e6856ffffffff010000000000000000066a04f09fa7a700000000";
+
+  t.equal(txHex, rawtx, "created donation transaction via memo");
 });
