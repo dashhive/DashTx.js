@@ -72,6 +72,7 @@ var DashTx = ("object" === typeof module && exports) || {};
   const VERSION = 3;
   const SATOSHIS = 100000000;
 
+  const MAX_U8 = Math.pow(2, 8) - 1;
   const MAX_U16 = Math.pow(2, 16) - 1;
   const MAX_U32 = Math.pow(2, 32) - 1;
   const MAX_U52 = Number.MAX_SAFE_INTEGER;
@@ -85,6 +86,10 @@ var DashTx = ("object" === typeof module && exports) || {};
   const OP_RETURN = "6a"; // 106
   // Satoshis (64-bit) + lockscript size + OP_RETURN + Message Len
   const OP_RETURN_HEADER_SIZE = 8 + 1 + 1 + 1;
+
+  const OP_PUSHDATA1 = "4c";
+  const OP_PUSHDATA1_INT = 0x4c; // 76
+  const OP_PUSHDATA2 = "4d";
 
   const OP_DUP = "76";
   const OP_HASH160 = "a9";
@@ -143,6 +148,11 @@ var DashTx = ("object" === typeof module && exports) || {};
     for (let output of txInfo.outputs) {
       if (output.memo) {
         let memoSize = output.memo.length / 2;
+        if (memoSize > MAX_U8) {
+          min += 2;
+        } else if (memoSize >= OP_PUSHDATA1_INT) {
+          min += 1;
+        }
         min += OP_RETURN_HEADER_SIZE + memoSize;
         continue;
       }
@@ -674,16 +684,23 @@ var DashTx = ("object" === typeof module && exports) || {};
       sep = "\n";
     }
 
+    // let txMap = {};
+
     /** @type Array<String> */
     let tx = [];
     let v = toUint32LE(version);
     tx.push(v);
+    // txMap.version = v;
 
     let nInputs = Tx.utils.toVarInt(inputs.length);
     tx.push(nInputs);
+    // txMap.input_count = nInputs;
+    // txMap.inputs = [];
 
     for (let input of inputs) {
       let inputHex = [];
+      // txMap.inputs.push(inputHex);
+
       //@ts-ignore
       let txId = input.txId;
 
@@ -706,7 +723,7 @@ var DashTx = ("object" === typeof module && exports) || {};
       let voutIndex = input.outputIndex;
       if (isNaN(voutIndex)) {
         throw new Error(
-          "expected utxo property'vout' to be an integer representing this input's previous output index",
+          "expected utxo property 'vout' to be an integer representing this input's previous output index",
         );
       }
       let reverseVout = toUint32LE(voutIndex);
@@ -739,11 +756,9 @@ var DashTx = ("object" === typeof module && exports) || {};
       let sequence = "ffffffff";
       inputHex.push(sequence);
 
-      tx.push(inputHex.join(sep));
+      let txIn = inputHex.join(sep);
+      tx.push(txIn);
     }
-
-    let nOutputs = Tx.utils.toVarInt(outputs.length);
-    tx.push(nOutputs);
 
     if (!outputs.length) {
       if (!_DANGER_donate) {
@@ -752,6 +767,11 @@ var DashTx = ("object" === typeof module && exports) || {};
         );
       }
     }
+
+    let nOutputs = Tx.utils.toVarInt(outputs.length);
+    tx.push(nOutputs);
+    // txMap.output_count = nOutputs;
+    // txMap.outputs = [];
 
     for (let i = 0; i < outputs.length; i += 1) {
       let output = outputs[i];
@@ -763,15 +783,24 @@ var DashTx = ("object" === typeof module && exports) || {};
             `memo outputs must not have 'satoshis', 'address', or 'pubKeyHash'`,
           );
         }
-        addMemo(tx, output.memo);
-        return;
+
+        let outputHex = Tx._createMemoScript(output.memo);
+        // txMap.outputs.push(outputHex);
+
+        let txOut = outputHex.join(sep);
+        tx.push(txOut);
+        continue;
       }
+
+      /** @type {Array<String>} */
+      let outputHex = [];
+      // txMap.outputs.push(outputHex);
 
       if (!output.satoshis) {
         throw new Error(`every output must have 'satoshis'`);
       }
       let satoshis = toUint64LE(output.satoshis);
-      tx.push(satoshis);
+      outputHex.push(satoshis);
 
       if (!output.pubKeyHash) {
         if (!output.address) {
@@ -782,35 +811,77 @@ var DashTx = ("object" === typeof module && exports) || {};
         output.pubKeyHash = Tx.utils.addrToPubKeyHash(output.address);
       }
       assertHex(output.pubKeyHash, `output[${i}].pubKeyHash`);
-      let lockScript = `${PKH_SCRIPT_SIZE}${OP_DUP}${OP_HASH160}${PKH_SIZE}${output.pubKeyHash}${OP_EQUALVERIFY}${OP_CHECKSIG}`;
-      tx.push(lockScript);
-    }
 
-    /**
-     * @param {Array<String>} tx - the array of tx hex strings
-     * @param {String} memoHex - the memo bytes, in hex
-     */
-    function addMemo(tx, memoHex) {
-      let satoshis = toUint64LE(0);
-      tx.push(satoshis);
+      //let lockScript = `${PKH_SCRIPT_SIZE}${OP_DUP}${OP_HASH160}${PKH_SIZE}${output.pubKeyHash}${OP_EQUALVERIFY}${OP_CHECKSIG}`;
+      outputHex.push(PKH_SCRIPT_SIZE);
+      outputHex.push(`${OP_DUP}${OP_HASH160}`);
+      outputHex.push(PKH_SIZE);
+      outputHex.push(output.pubKeyHash);
+      outputHex.push(`${OP_EQUALVERIFY}${OP_CHECKSIG}`);
 
-      let memoSize = memoHex.length / 2;
-      if (memoSize > 83) {
-        throw new Error(`memos are limited to 83 bytes`);
-      }
-
-      let lockScriptSize = memoSize + 2;
-      let lockScriptSizeHex = TxUtils.toVarInt(lockScriptSize);
-      let memoSizeHex = TxUtils.toVarInt(memoSize);
-      let lockScript = `${lockScriptSizeHex}${OP_RETURN}${memoSizeHex}${memoHex}`;
-      tx.push(lockScript);
+      let txOut = outputHex.join(sep);
+      tx.push(txOut);
     }
 
     let locktimeHex = toUint32LE(locktime);
     tx.push(locktimeHex);
+    // txMap.locktime = locktimeHex;
+
+    // console.log("DEBUG txMap", txMap);
 
     let txHex = tx.join(sep);
     return txHex;
+  };
+
+  /**
+   * @param {String} memoHex - the memo bytes, in hex
+   * @returns {Array<String>} - memo script hex
+   */
+  //@ts-ignore
+  Tx._createMemoScript = function (memoHex) {
+    let outputHex = [];
+    let satoshis = toUint64LE(0);
+    outputHex.push(satoshis);
+
+    let memoSize = memoHex.length / 2;
+    if (memoSize > 80) {
+      // Total lock script size is limited to 83 bytes.
+      // The message portion is limited to 75 bytes,
+      // but can be can extended up to 80 with OP_PUSHDATA1.
+      //
+      // See <https://docs.dash.org/projects/core/en/stable/docs/guide/transactions-standard-transactions.html#null-data>
+      throw new Error(
+        `memos are limited to 80 bytes as per "Core Docs: Standard Transactions: Null Data"`,
+      );
+    }
+
+    let lockScriptSize = memoSize + 2;
+
+    // See https://github.com/bitcoin-sv-specs/op_return/blob/master/01-PUSHDATA-data-element-framing.md#pushdata-data-framing-for-op_return
+    let opReturn = OP_RETURN;
+    if (memoSize > MAX_U8) {
+      opReturn = `${OP_RETURN}${OP_PUSHDATA2}`;
+      lockScriptSize += 2;
+    } else if (memoSize >= OP_PUSHDATA1_INT) {
+      opReturn = `${OP_RETURN}${OP_PUSHDATA1}`;
+      lockScriptSize += 1;
+    }
+
+    let memoSizeHex = memoSize.toString(16);
+    let isPadded = 0 === memoSizeHex.length % 2;
+    if (!isPadded) {
+      memoSizeHex = `0${memoSizeHex}`;
+    }
+
+    let lockScriptSizeHex = TxUtils.toVarInt(lockScriptSize);
+
+    //let lockScript = `${lockScriptSizeHex}${opReturn}${memoSizeHex}${memoHex}`;
+    outputHex.push(lockScriptSizeHex);
+    outputHex.push(opReturn);
+    outputHex.push(memoSizeHex);
+    outputHex.push(memoHex);
+
+    return outputHex;
   };
 
   Tx.sum = function (coins) {
