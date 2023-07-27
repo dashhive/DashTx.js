@@ -2,6 +2,8 @@
 
 let Zora = require("zora");
 
+let DashTx = require("../dashtx.js");
+
 function unsort(sorted) {
   let unsorted = [];
   let copy = sorted.slice(0);
@@ -97,8 +99,6 @@ let outputsSorted = [
     script: "76a9a0",
   },
 ];
-
-let DashTx = require("../");
 
 function testSort(sorter, sorted) {
   let copy = sorted.slice(0);
