@@ -762,13 +762,16 @@ var DashTx = ("object" === typeof module && exports) || {};
         );
       }
 
+      let encoder = new TextEncoder();
       let gifts = ["💸", "🎁", "🧧"];
       let indexIsh = Math.random() * 3;
       let index = Math.floor(indexIsh);
+      let gift = encoder.encode(gifts[index]);
+      let memo = TxUtils.bytesToHex(gift);
 
       outputs.push({
         satoshis: 0,
-        memo: gifts[index],
+        memo: memo,
       });
     }
 
@@ -783,7 +786,7 @@ var DashTx = ("object" === typeof module && exports) || {};
           );
         }
         Tx._addMemo(tx, output.memo);
-        return;
+        break;
       }
 
       if (!output.satoshis) {

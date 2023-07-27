@@ -59,3 +59,61 @@ Zora.test("memo lengths", async function (t) {
   DashTx._addMemo(tx80, memo80);
   t.deepEqual(tx80, tx80a, "80-byte memo fits with OP_PUSHDATA1");
 });
+
+Zora.test("can create memo tx", async function (t) {
+  let dashTx = DashTx.create({});
+
+  let privKeyHex =
+    "ba0863ae0c162d67ae68a7f1e9dfdb7e3c47a71d397e19d7442f1afef3928511";
+  let pkh = "82754a9c935fbfcdda5995a32006a68a8156ee2b";
+
+  let txId = "77".repeat(32);
+  let coins = [
+    { pubKeyHash: pkh, satoshis: 20000, txId: txId, outputIndex: 0 },
+  ];
+
+  /** @type {Array<DashTx.TxOutput>} */
+  let outputs = [];
+
+  let encoder = new TextEncoder();
+  let memoBytes = encoder.encode("Hello, Dash!");
+  let memoHex = DashTx.utils.bytesToHex(memoBytes);
+  outputs.push({ memo: memoHex, satoshis: 0 });
+
+  let changeOutput = { pubKeyHash: pkh };
+  let txInfo = await DashTx.legacyCreateTx(coins, outputs, changeOutput);
+
+  let privKey = DashTx.utils.hexToBytes(privKeyHex);
+  let keys = [privKey];
+  let txInfoSigned = await dashTx.hashAndSignAll(txInfo, keys);
+
+  t.ok(txInfoSigned.transaction, "created transaction with memo");
+});
+
+Zora.test("can create donation tx via memo", async function (t) {
+  let dashTx = DashTx.create({});
+
+  let privKeyHex =
+    "ba0863ae0c162d67ae68a7f1e9dfdb7e3c47a71d397e19d7442f1afef3928511";
+  let pkh = "82754a9c935fbfcdda5995a32006a68a8156ee2b";
+
+  let txId = "77".repeat(32);
+  let inputs = [
+    { pubKeyHash: pkh, satoshis: 20000, txId: txId, outputIndex: 0 },
+  ];
+
+  /** @type {Array<DashTx.TxOutput>} */
+  let outputs = [];
+
+  let txInfo = {
+    inputs: inputs,
+    outputs: outputs,
+    _DANGER_donate: true,
+  };
+
+  let privKey = DashTx.utils.hexToBytes(privKeyHex);
+  let keys = [privKey];
+  let txInfoSigned = await dashTx.hashAndSignAll(txInfo, keys);
+
+  t.ok(txInfoSigned.transaction, "created donation transaction via memo");
+});
