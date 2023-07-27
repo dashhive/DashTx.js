@@ -72,6 +72,7 @@ var DashTx = ("object" === typeof module && exports) || {};
   const VERSION = 3;
   const SATOSHIS = 100000000;
 
+  const MAX_U8 = Math.pow(2, 8) - 1;
   const MAX_U16 = Math.pow(2, 16) - 1;
   const MAX_U32 = Math.pow(2, 32) - 1;
   const MAX_U52 = Number.MAX_SAFE_INTEGER;
@@ -85,6 +86,10 @@ var DashTx = ("object" === typeof module && exports) || {};
   const OP_RETURN = "6a"; // 106
   // Satoshis (64-bit) + lockscript size + OP_RETURN + Message Len
   const OP_RETURN_HEADER_SIZE = 8 + 1 + 1 + 1;
+
+  const OP_PUSHDATA1 = "4c";
+  const OP_PUSHDATA1_INT = 0x4c; // 76
+  const OP_PUSHDATA2 = "4d";
 
   const OP_DUP = "76";
   const OP_HASH160 = "a9";
@@ -143,6 +148,11 @@ var DashTx = ("object" === typeof module && exports) || {};
     for (let output of txInfo.outputs) {
       if (output.memo) {
         let memoSize = output.memo.length / 2;
+        if (memoSize > MAX_U8) {
+          min += 2;
+        } else if (memoSize >= OP_PUSHDATA1_INT) {
+          min += 1;
+        }
         min += OP_RETURN_HEADER_SIZE + memoSize;
         continue;
       }
@@ -772,7 +782,7 @@ var DashTx = ("object" === typeof module && exports) || {};
             `memo outputs must not have 'satoshis', 'address', or 'pubKeyHash'`,
           );
         }
-        addMemo(tx, output.memo);
+        Tx._addMemo(tx, output.memo);
         return;
       }
 
@@ -795,31 +805,56 @@ var DashTx = ("object" === typeof module && exports) || {};
       tx.push(lockScript);
     }
 
-    /**
-     * @param {Array<String>} tx - the array of tx hex strings
-     * @param {String} memoHex - the memo bytes, in hex
-     */
-    function addMemo(tx, memoHex) {
-      let satoshis = toUint64LE(0);
-      tx.push(satoshis);
-
-      let memoSize = memoHex.length / 2;
-      if (memoSize > 83) {
-        throw new Error(`memos are limited to 83 bytes`);
-      }
-
-      let lockScriptSize = memoSize + 2;
-      let lockScriptSizeHex = TxUtils.toVarInt(lockScriptSize);
-      let memoSizeHex = TxUtils.toVarInt(memoSize);
-      let lockScript = `${lockScriptSizeHex}${OP_RETURN}${memoSizeHex}${memoHex}`;
-      tx.push(lockScript);
-    }
-
     let locktimeHex = toUint32LE(locktime);
     tx.push(locktimeHex);
 
     let txHex = tx.join(sep);
     return txHex;
+  };
+
+  /**
+   * @param {Array<String>} tx - the array of tx hex strings
+   * @param {String} memoHex - the memo bytes, in hex
+   */
+  //@ts-ignore
+  Tx._addMemo = function (tx, memoHex) {
+    let satoshis = toUint64LE(0);
+    tx.push(satoshis);
+
+    let memoSize = memoHex.length / 2;
+    if (memoSize > 80) {
+      // Total lock script size is limited to 83 bytes.
+      // The message portion is limited to 75 bytes,
+      // but can be can extended up to 80 with OP_PUSHDATA1.
+      //
+      // See <https://docs.dash.org/projects/core/en/stable/docs/guide/transactions-standard-transactions.html#null-data>
+      throw new Error(
+        `memos are limited to 80 bytes as per "Core Docs: Standard Transactions: Null Data"`,
+      );
+    }
+
+    let lockScriptSize = memoSize + 2;
+
+    // See https://github.com/bitcoin-sv-specs/op_return/blob/master/01-PUSHDATA-data-element-framing.md#pushdata-data-framing-for-op_return
+    let opReturn = OP_RETURN;
+    if (memoSize > MAX_U8) {
+      opReturn = `${OP_RETURN}${OP_PUSHDATA2}`;
+      lockScriptSize += 2;
+    } else if (memoSize >= OP_PUSHDATA1_INT) {
+      opReturn = `${OP_RETURN}${OP_PUSHDATA1}`;
+      lockScriptSize += 1;
+    }
+
+    let memoSizeHex = memoSize.toString(16);
+    let isPadded = 0 === memoSizeHex.length % 2;
+    if (!isPadded) {
+      memoSizeHex = `0${memoSizeHex}`;
+    }
+
+    let lockScriptSizeHex = TxUtils.toVarInt(lockScriptSize);
+
+    let lockScript = `${lockScriptSizeHex}${opReturn}${memoSizeHex}${memoHex}`;
+    tx.push(lockScript);
   };
 
   Tx.sum = function (coins) {
