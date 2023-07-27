@@ -1,7 +1,8 @@
 "use strict";
 
 let Zora = require("zora");
-let DashTx = require("../");
+
+let DashTx = require("../dashtx.js");
 
 let outputs = [
   {
