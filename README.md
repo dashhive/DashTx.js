@@ -5,21 +5,22 @@ Create a transaction for a crypto-currency network. \
 
 Server and browser compatible. Vanilla JS. 0 Dependencies.
 
-## Table of Contents
+# Table of Contents
 
 - Install & Initialize
   - Bun, Deno, Node
   - Vite, WebPack
   - Browsers
 - Example Usage
+- Example Coin Selection & Fee Calculation
 - Example Output
 - API
 - Anatomy of a Blockchain Transaction
 - CLI Debugger
 
-## Install & Initialize
+# Install & Initialize
 
-### Bun, Deno, Node, WebPack, Vite
+## Bun, Deno, Node, WebPack, Vite
 
 ```sh
 npm install --save @dashincubator/secp256k1
@@ -45,7 +46,7 @@ async function sign({ privateKey, hash }) {
 // ...
 ```
 
-### Browsers
+## Browsers
 
 ```html
 <script src="https://unpkg.com/@dashincubator/secp256k1/secp256k1.js"></script>
@@ -73,13 +74,15 @@ Note: You must provide your own `sign()` function, as shown below.
 })();
 ```
 
-### Example Usage
+## Example Usage
 
 See also: [example.js](/example.js).
 
 Note: You must provide your own `sign()` function, as shown above.
 
 ```js
+let memo = Tx.utils.strToHex("Hello, Dash!");
+
 let txInfo = {
   version: 3,
   inputs: [
@@ -89,9 +92,6 @@ let txInfo = {
       publicKey: "5bcd0d776a7252310b9f1a7eee1a749d42126944",
       sigHashType: 0x01,
       script: "76a9145bcd...694488ac",
-      getPrivateKey: function () {
-        return privateKeyBytes;
-      },
     },
   ],
   outputs: [
@@ -100,21 +100,27 @@ let txInfo = {
       satoshis: 5150,
     },
     {
-      // OP_RETURN messages are supported
-      memo: "Hello, Dash!",
+      // OP_RETURN messages are supported as HEX!
+      memo: memo,
       satoshis: 0,
     },
   ],
   locktime: 0,
 };
 
+// Note: your inputs and outputs will be sorted according to
+// "Lexicographical Indexing of Transaction Inputs and Outputs"
+txInfo.inputs.sort(Tx.sortInputs);
+txInfo.outputs.sort(Tx.sortOutputs);
+
+let keys = txInfo.inputs.map(getPrivateKey);
 let txInfoSigned = await tx.hashAndSignAll(txInfo);
 
 console.info(JSON.stringify(txInfo, null, 2));
 console.info(txInfo.transaction);
 ```
 
-#### Expanded
+### Expanded
 
 ```js
 // "XJREPzkMSHobz6kpxKd7reMiWr3YoyTdaj3sJXLGCmiDHaL7vmaQ"
@@ -136,9 +142,6 @@ let txInfo = {
       publicKey: publicKeyHex,
       sigHashType: 0x01,
       script: "76a9145bcd0d776a7252310b9f1a7eee1a749d4212694488ac",
-      getPrivateKey: function () {
-        return privateKey;
-      },
     },
   ],
   outputs: [
@@ -151,13 +154,72 @@ let txInfo = {
   locktime: 0,
 };
 
+// Note: your inputs and outputs will be sorted according to
+// "Lexicographical Indexing of Transaction Inputs and Outputs"
+txInfo.inputs.sort(Tx.sortInputs);
+txInfo.outputs.sort(Tx.sortOutputs);
+
+let keys = txInfo.inputs.map(getPrivateKey);
 let txInfoSigned = await tx.hashAndSignAll(txInfo);
 
 console.info(JSON.stringify(txInfo, null, 2));
 console.info(txInfoSigned.transaction);
 ```
 
-### Example Output
+## Example Coin Selection & Fee Calculation
+
+```text
+// for backwards compatibily with JSON Payment Protocol, etc
+Tx.createLegacyTx(coins, outputs, changeOutput)
+
+// (coming soon... ?)
+// for use with Contacts and Cash-Like send (uses XPubs & denominates coins)
+Tx.createTx(coins, outputs, { allowChange: true, breakChange: true })
+```
+
+Given an array of coins (UTXOs), DashTx can do the hard work of correctly
+selecting a minimal set of inputs that cover the output costs and fees, and
+insert a change output if necessary.
+
+```js
+let coins = [
+  {
+    satoshis: 1_000_00000,
+    txId: "7f305558cbeba3a9271d2559e8277f473f29d6b64a7a7a27e02a8564bde8352b",
+    outputIndex: 0,
+    // you may have one or more address identifiers
+    publicKey:
+      "03755be68d084e7ead4d83e23fb37c3076b16ead432de1b0bdf249290400f263cb",
+    pubKeyHash: "5bcd0d776a7252310b9f1a7eee1a749d42126944",
+    address: "Xj4Ey1oerk5KUKM71UQCTUBbmfyQuoUHDr",
+  },
+  {
+    satoshis: 2_500_00000,
+    // ...
+  },
+  {
+    satoshis: 1_500_00000,
+    // ...
+  },
+];
+
+let outputs = [
+  {
+    satoshis: 1_200_00000,
+    // ...
+  },
+];
+
+let changeOutput = {
+  pubKeyHash: "5bcd0d776a7252310b9f1a7eee1a749d42126944",
+};
+
+let txInfo = await Tx.createLegacyTx(coins, outputs, changeOutput);
+// { version, inputs, outputs, changeIndex, locktime }
+// let change = txInfo.outputs[txInfo.changeIndex];
+```
+
+## Example Output
 
 ```js
 console.info(JSON.stringify(txInfo, null, 2));
@@ -197,7 +259,7 @@ Note: in the actual transaction
 [7f3055...e8352b](https://insight.dash.org/insight/tx/7f305558cbeba3a9271d2559e8277f473f29d6b64a7a7a27e02a8564bde8352b)
 above, there were 2 inputs and 2 outputs. The example is truncated for brevity.
 
-## API
+# API
 
 <!--
 rg '^\s+Tx\.'
@@ -215,7 +277,7 @@ Tx.OUTPUT_SIZE         //  34
 /**
  * Creates a tx signer instance.
  */
-Tx.create({ sign });
+Tx.create({ sign, getPrivateKey });
 
 /**
  * Estimates the min, mid, and max sizes of (fees for) a transaction.
@@ -226,9 +288,25 @@ Tx.appraise({ inputs, outputs });
 // { min: 191, mid: 192, max: 193 }
 
 /**
+ * Magic. The old kind.
+ *
+ * Calculates totals, fees and output change, AND selects
+ * which UTXOs to use as inputs from the given coins.
+ *
+ * This should only be used for legacy (non-XPub) addresses
+ * and where denominated outputs cannot be used.
+ */
+Tx.createLegacyTx(coins, outputs, changeOutput);
+// { version, inputs, outputs, changeIndex, locktime}
+// let change = txInfo.outputs[txInfo.changeIndex];
+
+/**
  * Creates the variety of required hashable transactions
  * (one per each input), signs them, and then constructs
  * a broadcastable transaction.
+ *
+ * Note: your inputs and outputs will be sorted according to
+ * "Lexicographical Indexing of Transaction Inputs and Outputs"
  */
 tx.hashAndSignAll(txInfo);
 
@@ -274,7 +352,7 @@ Tx.getId(txHex);
 Tx.hashPartial(txHex);
 ```
 
-#### Utility Functions
+### Utility Functions
 
 ```js
 /**
@@ -294,20 +372,27 @@ Tx.utils.toVarIntSize(n);
 Tx.utils.reverseHex(hex);
 
 /**
+ * Convert a Uint8Array to a hex string
+ */
+Tx.utils.bytesToHex(bytes);
+
+/**
  * Convert a hex string to a Uint8Array
  */
 Tx.utils.hexToBytes(hex);
 
 /**
- * Convert a Uint8Array to a hex string
+ * Convert a text string to Hex (for memos)
+ *
+ * note: uses TextEncoder and bytesToHex
  */
-Tx.utils.bytesToHex(bytes);
+Tx.utils.strToHex(str);
 ```
 
-#### You-do-It Functions
+### You-do-It Functions
 
 ```js
-Tx.create({ sign });
+Tx.create({ sign, getPrivateKey });
 
 /**
  * Sign a 256-bit hash. 'canonical' form is required for
@@ -327,9 +412,29 @@ async function sign(privateKey, txHashBytes) {
 
   return Tx.utils.bytesToHex(sigBytes);
 }
+
+/**
+ * Given information that you provided about an input
+ * (which MUST include the public key, and MAY include
+ * the address or pubKeyHash), give back the corresponding
+ * private key (as bytes).
+ *
+ * For example, you could store private keys in a map by their
+ * corresponding address.
+ *
+ * @param {TxInput} txInput - publicKey, txId, outputIndex, etc
+ * @param {Number} i - the index of the inputs array
+ * @returns {Uint8Array} - the private key bytes
+ */
+async function getPrivateKey(txInput, i) {
+  let address = await DashKeys.pubkeyToAddr(txInput.publicKey);
+  let privateKey = privateKeys[address];
+
+  return privateKey;
+}
 ```
 
-## Fixtures
+# Fixtures
 
 <https://insight.dash.org/tx/a64557541b20a2d42021924231eb75cf2a3fd1ebf9888bfcc5d181b0b637a026>
 
@@ -344,12 +449,12 @@ PayAddr (Recipient):
 XdRgbwH1LEfFQUVY2DnmsVxfo33CRDhydj
 ```
 
-## Anatomy of a Blockchain Transaction
+# Anatomy of a Blockchain Transaction
 
 See
 [Anatomy of a Blockchain Transaction](https://github.com/dashhive/dashtx.js/issues/1).
 
-## CLI Debugger
+# CLI Debugger
 
 ```sh
 npm install --location=global dashtx
