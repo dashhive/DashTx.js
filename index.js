@@ -19,8 +19,6 @@ module.exports = require("./lib/dashtx.js")
  * @typedef {import('./dashtx.js').TxInput} TxInput
  * @typedef {import('./dashtx.js').TxInputHashable} TxInputHashable
  * @typedef {import('./dashtx.js').TxInputRaw} TxInputRaw
- * @typedef {import('./dashtx.js').TxInputUnspent} TxInputUnspent
- * @typedef {import('./dashtx.js').TxHasSats} TxHasSats
  * @typedef {import('./dashtx.js').TxInputSigned} TxInputSigned
  * @typedef {import('./dashtx.js').TxOutput} TxOutput
  */
