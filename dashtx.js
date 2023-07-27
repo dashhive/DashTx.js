@@ -20,7 +20,7 @@
  * @prop {TxCreateSigned} createSigned
  * @prop {TxGetId} getId - only useful for fully signed tx
  * @prop {TxHashPartial} hashPartial - useful for computing sigs
- * @prop {TxLegacyCreate} legacyCreateTx
+ * @prop {TxCreateLegacyTx} createLegacyTx
  * @prop {TxSortBySats} sortBySatsAsc
  * @prop {TxSortBySats} sortBySatsDsc
  * @prop {TxSortInputs} sortInputs
@@ -43,6 +43,7 @@
  * @prop {TxReverseHex} reverseHex
  * @prop {TxHexToBytes} hexToBytes
  * @prop {TxBytesToHex} bytesToHex
+ * @prop {TxStringToHex} strToHex
  */
 
 /**
@@ -191,12 +192,19 @@ var DashTx = ("object" === typeof module && exports) || {};
     async function hashAndSignAll(txInfo, keys) {
       let _myUtils = myUtils;
       if (keys) {
-        if (keys.length !== txInfo.inputs.length) {
-          throw new Error(
-            `number of 'keys' must match number of 'inputs' - each 'utxo' of the provided private key must be matched to that private key`,
-          );
+        //@ts-ignore
+        if (keys.getPrivateKey) {
+          //@ts-ignore
+          _myUtils.getPrivateKey = keys.getPrivateKey;
         }
-        _myUtils = Tx._createKeyUtils(myUtils, keys);
+        //@ts-ignore
+        else if (keys.length !== txInfo.inputs.length) {
+          throw new Error(
+            `the number and order of 'keys' must match number of 'inputs' - each 'utxo' of the provided private key must be matched to that private key`,
+          );
+        } else {
+          _myUtils = Tx._createKeyUtils(myUtils, keys);
+        }
       }
 
       return await Tx._hashAndSignAll(txInfo, _myUtils);
@@ -210,7 +218,7 @@ var DashTx = ("object" === typeof module && exports) || {};
   };
 
   //@ts-ignore
-  Tx.legacyCreateTx = async function (coins, outputs, changeOutput) {
+  Tx.createLegacyTx = async function (coins, outputs, changeOutput) {
     // TODO bump to 4 for DIP: enforce tx hygiene
     let version = 3;
 
@@ -307,6 +315,8 @@ var DashTx = ("object" === typeof module && exports) || {};
 
     return txInfo;
   };
+  //@ts-ignore
+  Tx.legacyCreateTx = Tx.createLegacyTx;
 
   Tx.sortBySatsAsc = function (a, b) {
     let aSats = BigInt(a.satoshis);
@@ -503,6 +513,30 @@ var DashTx = ("object" === typeof module && exports) || {};
   Tx._hashAndSignAll = async function (txInfo, myUtils) {
     let sigHashType = 0x01;
 
+    let sortedInputs = txInfo.inputs.slice(0);
+    sortedInputs.sort(Tx.sortInputs);
+    for (let i = 0; i < sortedInputs.length; i += 1) {
+      let isSelf = sortedInputs[i] === txInfo.inputs[i];
+      if (!isSelf) {
+        console.warn(
+          `txInfo.inputs are not ordered correctly, use txInfo.inputs.sort(Tx.sortInputs)\n(this will be an exception in the next version)`,
+        );
+        break;
+      }
+    }
+
+    let sortedOutputs = txInfo.outputs.slice(0);
+    sortedOutputs.sort(Tx.sortOutputs);
+    for (let i = 0; i < sortedOutputs.length; i += 1) {
+      let isSelf = sortedOutputs[i] === txInfo.outputs[i];
+      if (!isSelf) {
+        console.warn(
+          `txInfo.outputs are not ordered correctly, use txInfo.outputs.sort(Tx.sortOutputs)\n(this will be an exception in the next version)`,
+        );
+        break;
+      }
+    }
+
     let txInfoSigned = {
       /** @type {Array<TxInputHashable|TxInputSigned>} */
       inputs: [],
@@ -513,21 +547,7 @@ var DashTx = ("object" === typeof module && exports) || {};
 
     // temp shim
     if (!myUtils.getPrivateKey) {
-      console.warn(`you must provide 'keys' or 'getPrivateKey()'`);
-      //@ts-ignore
-      if (!txInfo?.inputs?.[0]?.getPrivateKey) {
-        throw new Error("");
-      }
-      //@ts-ignore
-      myUtils.getPrivateKey = async function (txInput) {
-        //@ts-ignore
-        let privKey = await txInput.getPrivateKey();
-        return privKey;
-      };
-    }
-    //@ts-ignore
-    if (txInfo?.inputs?.[0]?.getPrivateKey) {
-      console.warn(`deprecated use of 'txInput.getPrivateKey()'`);
+      throw new Error(`you must provide 'keys' or 'getPrivateKey()'`);
     }
 
     // temp shim
@@ -539,11 +559,7 @@ var DashTx = ("object" === typeof module && exports) || {};
         //@ts-ignore
         let pubKey = await myUtils.toPublicKey(privKey);
         if ("string" === typeof pubKey) {
-          console.warn(
-            "oops, you gave a publicKey as hex (deprecated) rather than a buffer",
-          );
-          //@ts-ignore
-          pubKey = Tx.utils.hexToBytes(pubKey);
+          throw new Error("publicKey must be given as a Uint8Array");
         }
         return pubKey;
       };
@@ -801,7 +817,7 @@ var DashTx = ("object" === typeof module && exports) || {};
           );
         }
 
-        let outputHex = Tx._createMemoScript(output.memo);
+        let outputHex = Tx._createMemoScript(output.memo, i);
         // txMap.outputs.push(outputHex);
 
         let txOut = outputHex.join(sep);
@@ -855,10 +871,12 @@ var DashTx = ("object" === typeof module && exports) || {};
    * @returns {Array<String>} - memo script hex
    */
   //@ts-ignore
-  Tx._createMemoScript = function (memoHex) {
+  Tx._createMemoScript = function (memoHex, i = 0) {
     let outputHex = [];
     let satoshis = toUint64LE(0);
     outputHex.push(satoshis);
+
+    assertHex(memoHex, `output[${i}].memo`);
 
     let memoSize = memoHex.length / 2;
     if (memoSize > 80) {
@@ -1210,6 +1228,14 @@ var DashTx = ("object" === typeof module && exports) || {};
   };
   TxUtils.u8ToHex = TxUtils.bytesToHex;
 
+  TxUtils.strToHex = function (str) {
+    let encoder = new TextEncoder();
+    let bytes = encoder.encode(str);
+    let hex = Tx.utils.bytesToHex(bytes);
+
+    return hex;
+  };
+
   Tx.utils = TxUtils;
 })(globalThis.window || {}, DashTx);
 if ("object" === typeof module) {
@@ -1332,6 +1358,11 @@ if ("object" === typeof module) {
  * @prop {String} [address] - 0x76, 0xa9, base58check bytes
  */
 
+/**
+ * @typedef TxSignOptions
+ * @prop {TxGetPrivateKey} getPrivateKey
+ */
+
 // Func Defs
 
 /**
@@ -1402,7 +1433,7 @@ if ("object" === typeof module) {
 /**
  * @callback TxHashAndSignAll
  * @param {TxInfo} txInfo
- * @param {Array<TxPrivateKey>} [keys]
+ * @param {Array<TxPrivateKey>|TxSignOptions} [keys]
  */
 
 /**
@@ -1419,10 +1450,10 @@ if ("object" === typeof module) {
  */
 
 /**
- * @callback TxLegacyCreate
+ * @callback TxCreateLegacyTx
  * @param {Array<TxInputUnspent>} coins
  * @param {Array<TxOutput>} outputs
- * @param {TxOutput} changeOutput - object with change address, pubKeyHash, or script
+ * @param {TxOutput} changeOutput - object with 0 satoshis and change address, pubKeyHash, or script
  * @returns {TxInfo}
  */
 
@@ -1499,5 +1530,11 @@ if ("object" === typeof module) {
 /**
  * @callback TxBytesToHex
  * @param {Uint8Array} buf
+ * @returns {String}
+ */
+
+/**
+ * @callback TxStringToHex
+ * @param {String} utf8
  * @returns {String}
  */
