@@ -23,6 +23,8 @@
  * @prop {TxLegacyCreate} legacyCreateTx
  * @prop {TxSortBySats} sortBySatsAsc
  * @prop {TxSortBySats} sortBySatsDsc
+ * @prop {TxSortInputs} sortInputs
+ * @prop {TxSortOutputs} sortOutputs
  * @prop {TxSum} sum - sums an array of TxInputUnspent
  * @prop {TxUtils} utils
  * @prop {Function} _create
@@ -278,6 +280,8 @@ var DashTx = ("object" === typeof module && exports) || {};
 
     taxes = total - subtotal;
 
+    inputs.sort(Tx.sortInputs);
+    outputs.sort(Tx.sortOutputs);
     let changeIndex = outputs.indexOf(changeOutput);
 
     let locktime = 0;
@@ -322,6 +326,123 @@ var DashTx = ("object" === typeof module && exports) || {};
     }
 
     return 0;
+  };
+
+  /**
+   * Lexicographical Indexing of Transaction Inputs and Outputs
+   * See <https://github.com/bitcoin/bips/blob/master/bip-0069.mediawiki>
+   *
+   * Keeps ordering deterministic to avoid data leakage.
+   *
+   * - ASC `txId` (a.k.a. `txid`, `prev_hash`)
+   *   Note: the comparison is done with the normal (Big-Endian) ordering
+   *   whereas the byte order of wire format is reversed (Little-Endian)
+   *
+   * - ASC `outputIndex` (a.k.a. `output_index`, `vout`)
+   */
+  Tx.sortInputs = function (a, b) {
+    // Ascending Lexicographical on TxId (prev-hash) in-memory (not wire) byte order
+    if (a.txId > b.txId) {
+      return 1;
+    }
+    if (a.txId < b.txId) {
+      return -1;
+    }
+
+    // Ascending Vout (Numerical)
+    let indexDiff = a.outputIndex - b.outputIndex;
+    return indexDiff;
+  };
+
+  /**
+   * Lexicographical Indexing of Transaction Inputs and Outputs
+   * See <https://github.com/bitcoin/bips/blob/master/bip-0069.mediawiki>
+   *
+   * Note: this must be updated to support new types of script comparison.
+   *
+   * @param {TxOutputSortable} a
+   * @param {TxOutputSortable} b
+   * @returns {Number}
+   */
+  Tx.sortOutputs = function (a, b) {
+    // the complexity is inherent, and doesn't seem to be reasonable to break out
+    /* jshint maxcomplexity:30 */
+
+    let satsA = BigInt(a.satoshis);
+    let satsB = BigInt(b.satoshis);
+    let sats = satsA - satsB;
+    if (sats < BIG_ZERO) {
+      return -1;
+    }
+    if (sats > BIG_ZERO) {
+      return 1;
+    }
+
+    // memo vs non-memo is settled by 'satoshis' being 0
+    // (otherwise there's a bug)
+    if (a.memo) {
+      if (!b.memo) {
+        throw new Error(`'satoshis' must be above 0, except for memos`);
+      }
+      if (a.memo < b.memo) {
+        return -1;
+      }
+      if (a.memo > b.memo) {
+        return 1;
+      }
+      return 0;
+    }
+
+    if (a.pubKeyHash && b.pubKeyHash) {
+      if (a.pubKeyHash > b.pubKeyHash) {
+        return 1;
+      }
+      if (a.pubKeyHash < b.pubKeyHash) {
+        return -1;
+      }
+      return 0;
+    }
+
+    if (a.address && b.address) {
+      if (a.address > b.address) {
+        return 1;
+      }
+      if (a.address < b.address) {
+        return -1;
+      }
+      return 0;
+    }
+
+    let scriptTypeA = `${OP_DUP}${OP_HASH160}`;
+    let scriptTypeB = scriptTypeA;
+    if (a.script) {
+      scriptTypeA = a.script.slice(0, 4);
+    }
+    if (b.script) {
+      scriptTypeB = b.script.slice(0, 4);
+    }
+    if (scriptTypeA < scriptTypeB) {
+      return -1;
+    }
+    if (scriptTypeA > scriptTypeB) {
+      return 1;
+    }
+
+    if (a.script && b.script) {
+      if (a.script < b.script) {
+        return -1;
+      }
+      if (a.script > b.script) {
+        return 1;
+      }
+      return 0;
+    }
+
+    let jsonA = JSON.stringify(a, null, 2);
+    let jsonB = JSON.stringify(b, null, 2);
+    throw new Error(
+      `developer error: these outputs cannot be compared:\n${jsonA}\n${jsonB}\n(probably either mixed types - address & pubKeyHash - or unsupported output types were given)`,
+    );
   };
 
   /**
