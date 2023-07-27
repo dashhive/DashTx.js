@@ -38,8 +38,8 @@ let Secp256k1 = require("@dashincubator/secp256k1");
 
 async function sign({ privateKey, hash }) {
   let sigOpts = { canonical: true, extraEntropy: true };
-  let sigBuf = await Secp256k1.sign(hash, privateKey, sigOpts);
-  return Tx.utils.u8ToHex(sigBuf);
+  let sigBytes = await Secp256k1.sign(hash, privateKey, sigOpts);
+  return Tx.utils.bytesToHex(sigBytes);
 }
 
 // ...
@@ -65,8 +65,8 @@ Note: You must provide your own `sign()` function, as shown below.
 
   async function sign({ privateKey, hash }) {
     let sigOpts = { canonical: true, extraEntropy: true };
-    let sigBuf = await Secp256k1.sign(hash, privateKey, sigOpts);
-    return Tx.utils.u8ToHex(sigBuf);
+    let sigBytes = await Secp256k1.sign(hash, privateKey, sigOpts);
+    return Tx.utils.bytesToHex(sigBytes);
   }
 
   // ...
@@ -90,7 +90,7 @@ let txInfo = {
       sigHashType: 0x01,
       script: "76a9145bcd...694488ac",
       getPrivateKey: function () {
-        return privateKeyBuf;
+        return privateKeyBytes;
       },
     },
   ],
@@ -120,7 +120,7 @@ console.info(txInfo.transaction);
 // "XJREPzkMSHobz6kpxKd7reMiWr3YoyTdaj3sJXLGCmiDHaL7vmaQ"
 let privateKeyHex =
   "d4c569f71ea2a9be6010cb3691f2757bc9539c60fd87e8bed21d7844d7b9b246";
-let privateKey = Tx.utils.hexToU8(privateKeyHex);
+let privateKey = Tx.utils.hexToBytes(privateKeyHex);
 
 let publicKeyHex =
   "03755be68d084e7ead4d83e23fb37c3076b16ead432de1b0bdf249290400f263cb";
@@ -296,12 +296,12 @@ Tx.utils.reverseHex(hex);
 /**
  * Convert a hex string to a Uint8Array
  */
-Tx.utils.hexToU8(hex);
+Tx.utils.hexToBytes(hex);
 
 /**
  * Convert a Uint8Array to a hex string
  */
-Tx.utils.u8ToHex(u8);
+Tx.utils.bytesToHex(bytes);
 ```
 
 #### You-do-It Functions
@@ -318,14 +318,14 @@ Tx.create({ sign });
  * We recommend @dashincubator/secp246k1 and @noble/secp246k1.
  *
  * @param {Uint8Array} privateKey - an input's corresponding key
- * @param {Uint8Array} txHashBuf - the (not reversed) 2x-sha256-hash
+ * @param {Uint8Array} txHashBytes - the (not reversed) 2x-sha256-hash
  * @returns {String} - hex representation of an ASN.1 signature
  */
-async function sign(privateKey, txHashBuf) {
+async function sign(privateKey, txHashBytes) {
   let sigOpts = { canonical: true };
-  let sigBuf = await Secp256k1.sign(txHashBuf, privateKey, sigOpts);
+  let sigBytes = await Secp256k1.sign(txHashBytes, privateKey, sigOpts);
 
-  return Tx.utils.u8ToHex(sigBuf);
+  return Tx.utils.bytesToHex(sigBytes);
 }
 ```
 
