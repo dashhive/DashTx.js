@@ -508,6 +508,7 @@ var DashTx = ("object" === typeof module && exports) || {};
       inputs: [],
       outputs: txInfo.outputs,
       _DANGER_donate: txInfo._DANGER_donate,
+      _donation_memo: txInfo._donation_memo,
     };
 
     // temp shim
@@ -678,6 +679,7 @@ var DashTx = ("object" === typeof module && exports) || {};
     /* maxFee = 10000, */
     _debug = false,
     _DANGER_donate = false,
+    _donation_memo,
   }) {
     let sep = "";
     if (_debug) {
@@ -766,6 +768,21 @@ var DashTx = ("object" === typeof module && exports) || {};
           `'outputs' list must not be empty - use the developer debug option '_DANGER_donate: true' to bypass`,
         );
       }
+
+      let memo = _donation_memo;
+      if (!memo) {
+        let encoder = new TextEncoder();
+        let gifts = ["💸", "🎁", "🧧"];
+        let indexIsh = Math.random() * 3;
+        let index = Math.floor(indexIsh);
+        let gift = encoder.encode(gifts[index]);
+        memo = TxUtils.bytesToHex(gift);
+      }
+
+      outputs.push({
+        satoshis: 0,
+        memo: memo,
+      });
     }
 
     let nOutputs = Tx.utils.toVarInt(outputs.length);

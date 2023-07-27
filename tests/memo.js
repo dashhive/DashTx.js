@@ -103,3 +103,40 @@ Zora.test("can create memo tx", async function (t) {
 
   t.equal(txInfoSigned.transaction, rawtx, "created transaction with memo");
 });
+
+Zora.test("can create donation tx via memo", async function (t) {
+  let privKeyHex =
+    "ba0863ae0c162d67ae68a7f1e9dfdb7e3c47a71d397e19d7442f1afef3928511";
+  let pkh = "82754a9c935fbfcdda5995a32006a68a8156ee2b";
+
+  let txId = "77".repeat(32);
+  let inputs = [
+    { pubKeyHash: pkh, satoshis: 20000, txId: txId, outputIndex: 0 },
+  ];
+
+  /** @type {Array<DashTx.TxOutput>} */
+  let outputs = [];
+
+  let encoder = new TextEncoder();
+  //let memoBytes = encoder.encode("💸");
+  //let memoBytes = encoder.encode("🎁");
+  let memoBytes = encoder.encode("🧧");
+  let memo = DashTx.utils.bytesToHex(memoBytes);
+
+  let txInfo = {
+    inputs: inputs,
+    outputs: outputs,
+    _DANGER_donate: true,
+    _donation_memo: memo,
+  };
+
+  let privKey = DashTx.utils.hexToBytes(privKeyHex);
+  let keys = [privKey];
+  let txInfoSigned = await dashTx.hashAndSignAll(txInfo, keys);
+  let txHex = txInfoSigned.transaction;
+
+  let rawtx =
+    "03000000017777777777777777777777777777777777777777777777777777777777777777000000006b483045022100d2a13920c4002ee76df3cd3a0afcebb12e71871c63bb49ba379de6d709f488b60220627252f66903c3dfa69ba86a581c09342721a15d75e2a455a2dff09187e7668e012103f808bdec4293bf12441ec9a9e61bc3b264c78fcc5ad499ce5f0799f2874e6856ffffffff010000000000000000066a04f09fa7a700000000";
+
+  t.equal(txHex, rawtx, "created donation transaction via memo");
+});
