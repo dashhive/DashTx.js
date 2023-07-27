@@ -1,5 +1,7 @@
 "use strict";
 
+let Zora = require("zora");
+
 /** @typedef {import('../dashtx.js').TxInputHashable} TxInputHashable */
 /** @typedef {import('../dashtx.js').TxInputSigned} TxInputSigned */
 let Tx = require("../dashtx.js");
@@ -7,11 +9,12 @@ let Tx = require("../dashtx.js");
 //@ts-ignore
 let Secp256k1 = exports.nobleSecp256k1 || require("@dashincubator/secp256k1");
 
-//let minimumCost = HEADER_SIZE + MIN_INPUT_SIZE + OUTPUT_SIZE + extraCost;
-
 //
 // Example using Dash
 //
+let rawtx =
+  "03000000022b35e8bd64852ae0277a7a4ab6d6293f477f27e859251d27a9a3ebcb5855307f000000006b48304502210098ba308087f7bcc5d9f6c347ffd633422bbbe8d44a20c21a2d5574da35d0a2070220026cae84cec2d96fd4e1a837ab0f3a559fdbd4b19bdd60c4dec450565f79f5f3012103e10848073f3f92f43d718ed1be39afe7314e410eb7080bbc4474e82fe88c5cf2ffffffff2b35e8bd64852ae0277a7a4ab6d6293f477f27e859251d27a9a3ebcb5855307f010000006b483045022100a6ec8b004c6e24047df4a9b2198a42c92862c4b3ad7ac989c85a04ba86fbdb3702200febea2871834d70c1c9d754cbe8163def8f1f721eb8b833098e01bd49ccae65012103e10848073f3f92f43d718ed1be39afe7314e410eb7080bbc4474e82fe88c5cf2ffffffff020a090000000000001976a9145bcd0d776a7252310b9f1a7eee1a749d4212694488ac0a090000000000001976a9145bcd0d776a7252310b9f1a7eee1a749d4212694488ac00000000";
+
 let txId = "7f305558cbeba3a9271d2559e8277f473f29d6b64a7a7a27e02a8564bde8352b";
 let prevLockScript = [
   "76", // OP_DUP
@@ -69,43 +72,43 @@ let txInfo = {
   ],
   locktime: 0,
 };
-let privKey = Tx.utils.hexToU8(privKeyHex);
-//let keys = [key, key];
 
-let tx = Tx.create({
-  // required
-  sign: async function (privateKey, hash) {
-    let sigBuf = await Secp256k1.sign(hash, privateKey, {
-      canonical: true,
-    });
-    return sigBuf;
-  },
-  getPrivateKey: async function (txInput) {
-    return privKey;
-  },
-  // convenience
-  toPublicKey: async function (privateKey) {
-    let isCompressed = true;
-    let pubKeyBuf = Secp256k1.getPublicKey(privateKey, isCompressed);
-    return pubKeyBuf;
-  },
-  // convenience
-  ripemd160: function () {},
-  // convenience
-  addressToPubKeyHash: function () {},
-});
+Zora.test("reproduce known rawtx", async function (t) {
+  let keysMap = {};
+  keysMap[prevLockScript] = Tx.utils.hexToU8(privKeyHex);
 
-tx.hashAndSignAll(txInfo /*, keys*/)
-  .then(function (txInfoSigned) {
-    console.error();
-    console.error(txInfoSigned);
-    console.error();
-    console.info(txInfoSigned.transaction);
-    console.error();
-    process.exit(0);
-  })
-  .catch(function (err) {
-    console.error("Fail:");
-    console.error(err.stack || err);
-    process.exit(1);
+  let tx = Tx.create({
+    sign: async function (privateKey, hash) {
+      let sigOpts = {
+        canonical: true,
+        // ONLY FOR TESTING: use deterministic signature (rather than random)
+        extraEntropy: null,
+      };
+      let sigBuf = await Secp256k1.sign(hash, privateKey, sigOpts);
+      return sigBuf;
+    },
+    getPrivateKey: async function (txInput) {
+      let privKey = keysMap[txInput.script];
+      return privKey;
+    },
+    // convenience
+    toPublicKey: async function (privateKey) {
+      let isCompressed = true;
+      let pubKeyBuf = Secp256k1.getPublicKey(privateKey, isCompressed);
+      return pubKeyBuf;
+    },
+    // convenience
+    //ripemd160: function () {},
+    // convenience
+    //addressToPubKeyHash: function () {},
   });
+
+  await tx
+    .hashAndSignAll(txInfo /*, keys*/)
+    .then(function (txInfoSigned) {
+      t.equal(rawtx, txInfoSigned.transaction);
+    })
+    .catch(function (err) {
+      t.ok(false, err.message);
+    });
+});

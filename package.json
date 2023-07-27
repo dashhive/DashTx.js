@@ -35,6 +35,7 @@
   "homepage": "https://github.com/dashhive/dashtx.js#readme",
   "devDependencies": {
     "@dashincubator/secp256k1": "^1.7.1-5",
-    "dashkeys": "^1.0.1"
+    "dashkeys": "^1.0.1",
+    "zora": "^5.2.0"
   }
 }
