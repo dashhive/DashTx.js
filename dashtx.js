@@ -41,8 +41,8 @@
  * @prop {TxToVarInt} toVarInt
  * @prop {TxToVarIntSize} toVarIntSize
  * @prop {TxReverseHex} reverseHex
- * @prop {TxHexToU8} hexToU8
- * @prop {TxU8ToHex} u8ToHex
+ * @prop {TxHexToBytes} hexToBytes
+ * @prop {TxBytesToHex} bytesToHex
  */
 
 /**
@@ -482,7 +482,7 @@ var DashTx = ("object" === typeof module && exports) || {};
           "oops, you gave a publicKey as hex (deprecated) rather than a buffer",
         );
         //@ts-ignore
-        pubKey = Tx.utils.hexToU8(pubKey);
+        pubKey = Tx.utils.hexToBytes(pubKey);
       }
       //@ts-ignore
       return pubKey;
@@ -542,7 +542,7 @@ var DashTx = ("object" === typeof module && exports) || {};
             "oops, you gave a publicKey as hex (deprecated) rather than a buffer",
           );
           //@ts-ignore
-          pubKey = Tx.utils.hexToU8(pubKey);
+          pubKey = Tx.utils.hexToBytes(pubKey);
         }
         return pubKey;
       };
@@ -559,7 +559,7 @@ var DashTx = ("object" === typeof module && exports) || {};
       let privKey = await myUtils.getPrivateKey(txInput, i, txInfo.inputs);
 
       let sigBuf = await myUtils.sign(privKey, txHashBuf);
-      let sigHex = Tx.utils.u8ToHex(sigBuf);
+      let sigHex = Tx.utils.bytesToHex(sigBuf);
       if ("string" === typeof sigBuf) {
         console.warn(`sign() should return a Uint8Array of an ASN.1 signature`);
         sigHex = sigBuf;
@@ -569,7 +569,7 @@ var DashTx = ("object" === typeof module && exports) || {};
       if (!pubKeyHex) {
         //@ts-ignore
         let pubKey = await myUtils.getPublicKey(txInput, i, txInfo.inputs);
-        pubKeyHex = Tx.utils.u8ToHex(pubKey);
+        pubKeyHex = Tx.utils.bytesToHex(pubKey);
       }
       if ("string" !== typeof pubKeyHex) {
         let warn = new Error("stack");
@@ -577,7 +577,7 @@ var DashTx = ("object" === typeof module && exports) || {};
           `utxo inputs should be plain JSON and use hex rather than buffers for 'publicKey'`,
           warn.stack,
         );
-        pubKeyHex = Tx.utils.u8ToHex(pubKeyHex);
+        pubKeyHex = Tx.utils.bytesToHex(pubKeyHex);
       }
 
       let txInputSigned = {
@@ -589,7 +589,7 @@ var DashTx = ("object" === typeof module && exports) || {};
       };
 
       // expose _actual_ values used, for debugging
-      let txHashHex = Tx.utils.u8ToHex(txHashBuf);
+      let txHashHex = Tx.utils.bytesToHex(txHashBuf);
       txInput._hash = txHashHex;
       txInput._signature = sigHex.toString();
       txInput._lockScript = txInfo.inputs[i].script;
@@ -868,7 +868,7 @@ var DashTx = ("object" === typeof module && exports) || {};
   };
 
   Tx.getId = async function (txHex) {
-    let u8 = Tx.utils.hexToU8(txHex);
+    let u8 = Tx.utils.hexToBytes(txHex);
     //console.log("Broadcastable Tx Buffer");
     //console.log(u8);
 
@@ -887,7 +887,7 @@ var DashTx = ("object" === typeof module && exports) || {};
     //console.log("Reversed Round 2 Hash Buffer");
     //console.log(reverseU8);
 
-    let id = Tx.utils.u8ToHex(reverseU8);
+    let id = Tx.utils.bytesToHex(reverseU8);
     return id;
   };
 
@@ -900,7 +900,7 @@ var DashTx = ("object" === typeof module && exports) || {};
     //console.log("Signable Tx Hex");
     //console.log(txSignable);
 
-    let u8 = Tx.utils.hexToU8(txSignable);
+    let u8 = Tx.utils.hexToBytes(txSignable);
     //console.log("Signable Tx Buffer");
     //console.log(u8);
 
@@ -970,7 +970,7 @@ var DashTx = ("object" === typeof module && exports) || {};
   /**
    * @param {String} hex
    */
-  TxUtils.hexToU8 = function (hex) {
+  TxUtils.hexToBytes = function (hex) {
     let bufLen = hex.length / 2;
     let u8 = new Uint8Array(bufLen);
 
@@ -992,6 +992,7 @@ var DashTx = ("object" === typeof module && exports) || {};
 
     return u8;
   };
+  TxUtils.hexToU8 = TxUtils.hexToBytes;
 
   /**
    * @param {String} hex
@@ -1152,7 +1153,7 @@ var DashTx = ("object" === typeof module && exports) || {};
    * @returns {String} hex
    */
   //@ts-ignore
-  TxUtils.u8ToHex = function (u8) {
+  TxUtils.bytesToHex = function (u8) {
     /** @type {Array<String>} */
     let hex = [];
 
@@ -1163,6 +1164,7 @@ var DashTx = ("object" === typeof module && exports) || {};
 
     return hex.join("");
   };
+  TxUtils.u8ToHex = TxUtils.bytesToHex;
 
   Tx.utils = TxUtils;
 })(globalThis.window || {}, DashTx);
@@ -1367,7 +1369,7 @@ if ("object" === typeof module) {
  */
 
 /**
- * @callback TxHexToU8
+ * @callback TxHexToBytes
  * @param {String} hex
  * @returns {Uint8Array}
  */
@@ -1451,7 +1453,7 @@ if ("object" === typeof module) {
  */
 
 /**
- * @callback TxU8ToHex
+ * @callback TxBytesToHex
  * @param {Uint8Array} buf
  * @returns {String}
  */
