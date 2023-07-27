@@ -3,10 +3,14 @@
  * @prop {Number} SATOSHIS
  * @prop {Number} _HEADER_ONLY_SIZE
  * @prop {Number} HEADER_SIZE
+ * @prop {Number} LEGACY_DUST
+ * @prop {bigint} _BIG_LEGACY_DUST
  * @prop {Number} MIN_INPUT_SIZE - 147 each
  * @prop {Number} MAX_INPUT_PAD - 2 (possible ASN.1 BigInt padding)
  * @prop {Number} MAX_INPUT_SIZE - 149 each (with padding)
+ * @prop {bigint} _BIG_MAX_INPUT_SIZE
  * @prop {Number} OUTPUT_SIZE - 34 each
+ * @prop {bigint} _BIG_OUTPUT_SIZE
  * @prop {TxAppraise} appraise
  * @prop {TxToDash} toDash
  * @prop {TxToSats} toSats
@@ -16,6 +20,10 @@
  * @prop {TxCreateSigned} createSigned
  * @prop {TxGetId} getId - only useful for fully signed tx
  * @prop {TxHashPartial} hashPartial - useful for computing sigs
+ * @prop {TxLegacyCreate} legacyCreateTx
+ * @prop {TxSortBySats} sortBySatsAsc
+ * @prop {TxSortBySats} sortBySatsDsc
+ * @prop {TxSum} sum - sums an array of TxInputUnspent
  * @prop {TxUtils} utils
  * @prop {Function} _create
  * @prop {Function} _createKeyUtils
@@ -57,6 +65,8 @@ var DashTx = ("object" === typeof module && exports) || {};
 
   let TxUtils = {};
 
+  const BIG_ZERO = 0n;
+
   const VERSION = 3;
   const SATOSHIS = 100000000;
 
@@ -87,6 +97,8 @@ var DashTx = ("object" === typeof module && exports) || {};
     "JavaScript 'BigInt's are arbitrarily large, but you may only use up to UINT64 for transactions";
 
   Tx.SATOSHIS = SATOSHIS;
+  Tx.LEGACY_DUST = 2000;
+  Tx._BIG_LEGACY_DUST = BigInt(Tx.LEGACY_DUST);
 
   Tx._HEADER_ONLY_SIZE =
     4 + // version
@@ -111,11 +123,13 @@ var DashTx = ("object" === typeof module && exports) || {};
     0; // Public Key value is NOT BigInt padded
 
   Tx.MAX_INPUT_SIZE = Tx.MIN_INPUT_SIZE + Tx.MAX_INPUT_PAD;
+  Tx._BIG_MAX_INPUT_SIZE = BigInt(Tx.MAX_INPUT_SIZE);
 
   Tx.OUTPUT_SIZE = // 34 each
     8 + // satoshis (base units) value
     1 + // lockscript size
     25; // lockscript
+  Tx._BIG_OUTPUT_SIZE = BigInt(Tx.OUTPUT_SIZE);
 
   Tx.appraise = function (txInfo) {
     let min = Tx._HEADER_ONLY_SIZE;
@@ -181,6 +195,133 @@ var DashTx = ("object" === typeof module && exports) || {};
       hashAndSignAll: hashAndSignAll,
     };
     return txInst;
+  };
+
+  //@ts-ignore
+  Tx.legacyCreateTx = async function (coins, outputs, changeOutput) {
+    // TODO bump to 4 for DIP: enforce tx hygiene
+    let version = 3;
+
+    coins = coins.slice(0);
+    outputs = outputs.slice(0);
+    changeOutput = Object.assign({}, changeOutput);
+
+    // sort largest first (descending)
+    coins.sort(Tx.sortBySatsAsc);
+
+    let totalBalance = Tx.sum(coins);
+
+    /** @type {Array<TxInputUnspent>} */
+    let inputs = [];
+    let fees = DashTx.appraise({ inputs, outputs });
+    let taxes = BigInt(fees.max);
+    // requires at least one input
+    taxes += Tx._BIG_MAX_INPUT_SIZE;
+
+    //@ts-ignore
+    let subtotal = Tx.sum(outputs);
+    let total = subtotal + taxes;
+
+    let cash = BIG_ZERO;
+    /** @type {Array<TxInputUnspent>} */
+    let biggerOrEqual = [];
+    for (;;) {
+      let input = coins.pop();
+      if (input) {
+        if (input.satoshis >= total) {
+          biggerOrEqual.push(input);
+          continue;
+        }
+      }
+
+      if (biggerOrEqual.length) {
+        //@ts-ignore - not undefined because we just length
+        input = biggerOrEqual.pop();
+      }
+
+      if (!input) {
+        break;
+      }
+
+      let sats = BigInt(input.satoshis);
+      cash += sats;
+      inputs.push(input);
+
+      if (cash >= total) {
+        break;
+      }
+
+      // requires at least one more input
+      total += Tx._BIG_MAX_INPUT_SIZE;
+    }
+
+    if (cash < total) {
+      total -= Tx._BIG_MAX_INPUT_SIZE;
+      if (cash < totalBalance) {
+        throw new Error(
+          `developer error: did not use full balance of ${totalBalance} when calculating available balance of ${cash} to pay ${total}`,
+        );
+      }
+      throw new Error(
+        `balance of ${cash} cannot pay for the transaction + fees of ${total}`,
+      );
+    }
+
+    let change = BIG_ZERO;
+    let dust = cash + -total + -Tx._BIG_OUTPUT_SIZE;
+    if (dust >= Tx._BIG_LEGACY_DUST) {
+      change = dust;
+      changeOutput.satoshis = change;
+      outputs.push(changeOutput);
+      total += Tx._BIG_OUTPUT_SIZE;
+    }
+
+    taxes = total - subtotal;
+
+    let changeIndex = outputs.indexOf(changeOutput);
+
+    let locktime = 0;
+
+    let txInfo = {
+      version,
+      inputs,
+      outputs,
+      changeIndex,
+      locktime,
+    };
+    // let change = txInfo.outputs[txInfo.changeIndex];
+
+    return txInfo;
+  };
+
+  Tx.sortBySatsAsc = function (a, b) {
+    let aSats = BigInt(a.satoshis);
+    let bSats = BigInt(b.satoshis);
+
+    let diff = aSats - bSats;
+    if (diff > BIG_ZERO) {
+      return 1;
+    }
+    if (diff < BIG_ZERO) {
+      return -1;
+    }
+
+    return 0;
+  };
+
+  Tx.sortBySatsDsc = function (a, b) {
+    let aSats = BigInt(a.satoshis);
+    let bSats = BigInt(b.satoshis);
+
+    let diff = aSats - bSats;
+    if (diff > BIG_ZERO) {
+      return -1;
+    }
+    if (diff < BIG_ZERO) {
+      return 1;
+    }
+
+    return 0;
   };
 
   /**
@@ -420,7 +561,7 @@ var DashTx = ("object" === typeof module && exports) || {};
     let nInputs = Tx.utils.toVarInt(inputs.length);
     tx.push(nInputs);
 
-    inputs.forEach(function (input) {
+    for (let input of inputs) {
       let inputHex = [];
       //@ts-ignore
       let txId = input.txId;
@@ -478,7 +619,7 @@ var DashTx = ("object" === typeof module && exports) || {};
       inputHex.push(sequence);
 
       tx.push(inputHex.join(sep));
-    });
+    }
 
     let nOutputs = Tx.utils.toVarInt(outputs.length);
     tx.push(nOutputs);
@@ -490,7 +631,10 @@ var DashTx = ("object" === typeof module && exports) || {};
         );
       }
     }
-    outputs.forEach(function (output, i) {
+
+    for (let i = 0; i < outputs.length; i += 1) {
+      let output = outputs[i];
+
       if (output.memo) {
         let invalid = output.satoshis || output.address || output.pubKeyHash;
         if (invalid) {
@@ -519,7 +663,7 @@ var DashTx = ("object" === typeof module && exports) || {};
       assertHex(output.pubKeyHash, `output[${i}].pubKeyHash`);
       let lockScript = `${PKH_SCRIPT_SIZE}${OP_DUP}${OP_HASH160}${PKH_SIZE}${output.pubKeyHash}${OP_EQUALVERIFY}${OP_CHECKSIG}`;
       tx.push(lockScript);
-    });
+    }
 
     /**
      * @param {Array<String>} tx - the array of tx hex strings
@@ -546,6 +690,16 @@ var DashTx = ("object" === typeof module && exports) || {};
 
     let txHex = tx.join(sep);
     return txHex;
+  };
+
+  Tx.sum = function (coins) {
+    let balance = BIG_ZERO;
+    for (let utxo of coins) {
+      let sats = BigInt(utxo.satoshis);
+      balance += sats;
+    }
+
+    return balance;
   };
 
   Tx.getId = async function (txHex) {
@@ -911,6 +1065,7 @@ if ("object" === typeof module) {
  * @prop {String} [address] - BaseCheck58-encoded pubKeyHash
  * @prop {String} txId - hex (not pre-reversed)
  * @prop {Number} outputIndex - index in previous tx's output (vout index)
+ * @prop {Number|bigint} [satoshis] - (included for convenience as type hack)
  * @prop {String} [signature] - (included as type hack)
  * @prop {String} [script] - the previous lock script (default: derived from public key as p2pkh)
  * @prop {String} [publicKey] - hex-encoded public key (typically starts with a 0x02 or 0x03 prefix)
@@ -927,6 +1082,25 @@ if ("object" === typeof module) {
  */
 
 /**
+ * @typedef TxInputUnspent
+ * @prop {String} [address] - BaseCheck58-encoded pubKeyHash
+ * @prop {Number} satoshis
+ * @prop {String} txId - hex (not pre-reversed)
+ * @prop {Number} outputIndex - index in previous tx's output (vout index)
+ */
+
+/**
+ * @typedef TxInputSortable
+ * @prop {String} txId
+ * @prop {Number} outputIndex
+ */
+
+/**
+ * @typedef TxHasSats
+ * @prop {Number|bigint} satoshis
+ */
+
+/**
  * @typedef {Pick<TxInput, "txId"|"outputIndex"|"signature"|"publicKey"|"sigHashType">} TxInputSigned
  */
 
@@ -935,7 +1109,16 @@ if ("object" === typeof module) {
  * @prop {String} [memo] - hex bytes of a memo (incompatible with pubKeyHash / address)
  * @prop {String} [address] - payAddr as Base58Check (human-friendly)
  * @prop {String} [pubKeyHash] - payAddr's raw hex value (decoded, not Base58Check)
- * @prop {Number|BigInt} satoshis - the number of smallest units of the currency
+ * @prop {Number|bigint} satoshis - the number of smallest units of the currency
+ */
+
+/**
+ * @typedef TxOutputSortable
+ * @prop {Number|bigint} satoshis
+ * @prop {String} [script] - hex bytes in wire order
+ * @prop {String} [memo] - 0x6a, hex bytes
+ * @prop {String} [pubKeyHash] - 0x76, 0xa9, hex bytes
+ * @prop {String} [address] - 0x76, 0xa9, base58check bytes
  */
 
 // Func Defs
@@ -1025,6 +1208,14 @@ if ("object" === typeof module) {
  */
 
 /**
+ * @callback TxLegacyCreate
+ * @param {Array<TxInputUnspent>} coins
+ * @param {Array<TxOutput>} outputs
+ * @param {TxOutput} changeOutput - object with change address, pubKeyHash, or script
+ * @returns {TxInfo}
+ */
+
+/**
  * @callback TxReverseHex
  * @param {String} hex
  * @returns {String} - hex pairs in reverse order
@@ -1035,6 +1226,33 @@ if ("object" === typeof module) {
  * @param {TxPrivateKey} privateKey
  * @param {Uint8Array} txHashBytes
  * @returns {TxSignature} - buf
+ */
+
+/**
+ * @callback TxSortBySats
+ * @param {TxHasSats} a
+ * @param {TxHasSats} b
+ * @returns {Number}
+ */
+
+/**
+ * @callback TxSortInputs
+ * @param {TxInputSortable} a
+ * @param {TxInputSortable} b
+ * @returns {Number}
+ */
+
+/**
+ * @callback TxSortOutputs
+ * @param {TxOutputSortable} a
+ * @param {TxOutputSortable} b
+ * @returns {Number}
+ */
+
+/**
+ * @callback TxSum
+ * @param {Array<TxHasSats>} coins
+ * @returns {bigint}
  */
 
 /**
