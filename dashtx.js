@@ -1017,7 +1017,9 @@ var DashTx = ("object" === typeof module && exports) || {};
    * @returns {String} - pubKeyHash in the raw (hex)
    */
   TxUtils.addrToPubKeyHash = function (addr) {
-    let Base58Check = require("@dashincubator/base58check").Base58Check;
+    let Base58Check =
+      //@ts-ignore
+      window.Base58Check || require("@dashincubator/base58check").Base58Check;
     let b58c = Base58Check.create({
       pubKeyHashVersion: "4c",
       privateKeyVersion: "cc",
@@ -1073,7 +1075,7 @@ var DashTx = ("object" === typeof module && exports) || {};
   TxUtils.sign = async function signTx(privateKey, txHashBuf) {
     let Secp256k1 =
       //@ts-ignore
-      exports.nobleSecp256k1 || require("@dashincubator/secp256k1");
+      window.nobleSecp256k1 || require("@dashincubator/secp256k1");
 
     let sigOpts = { canonical: true, extraEntropy: true };
     let sigBuf = await Secp256k1.sign(txHashBuf, privateKey, sigOpts);
@@ -1087,7 +1089,7 @@ var DashTx = ("object" === typeof module && exports) || {};
   TxUtils.toPublicKey = function (privateKey) {
     let Secp256k1 =
       //@ts-ignore
-      exports.nobleSecp256k1 || require("@dashincubator/secp256k1");
+      window.nobleSecp256k1 || require("@dashincubator/secp256k1");
 
     let isCompressed = true;
     let pubKeyBuf = Secp256k1.getPublicKey(privateKey, isCompressed);
@@ -1237,6 +1239,9 @@ var DashTx = ("object" === typeof module && exports) || {};
   };
 
   Tx.utils = TxUtils;
+
+  //@ts-ignore
+  window.DashTx = Tx;
 })(globalThis.window || {}, DashTx);
 if ("object" === typeof module) {
   module.exports = DashTx;
