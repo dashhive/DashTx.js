@@ -541,6 +541,7 @@ var DashTx = ("object" === typeof module && exports) || {};
       /** @type {Array<TxInputHashable|TxInputSigned>} */
       inputs: [],
       outputs: txInfo.outputs,
+      version: txInfo.version,
       _DANGER_donate: txInfo._DANGER_donate,
       _donation_memo: txInfo._donation_memo,
     };
