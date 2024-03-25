@@ -217,6 +217,11 @@ var DashTx = ("object" === typeof module && exports) || {};
     return txInst;
   };
 
+  /**
+   * Creates a transaction that is guaranteed to be signable.  Selects
+   * the smallest coin that is bigger or equal to the amount sent + fees,
+   * or the largest available coins until that total is met.
+   */
   //@ts-ignore
   Tx.createLegacyTx = async function (coins, outputs, changeOutput) {
     // TODO bump to 4 for DIP: enforce tx hygiene
@@ -226,7 +231,6 @@ var DashTx = ("object" === typeof module && exports) || {};
     outputs = outputs.slice(0);
     changeOutput = Object.assign({}, changeOutput);
 
-    // sort largest first (descending)
     coins.sort(Tx.sortBySatsAsc);
 
     let totalBalance = Tx.sum(coins);
