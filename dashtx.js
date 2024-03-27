@@ -9,6 +9,8 @@
  * @prop {Uint32} MAX_INPUT_SIZE - 149 each (with padding)
  * @prop {Uint32} OUTPUT_SIZE - 34 each
  * @prop {TxAppraise} appraise
+ * @prop {TxAppraiseCounts} _appraiseCounts
+ * @prop {TxAppraiseMemos} _appraiseMemos
  * @prop {TxToDash} toDash
  * @prop {TxToSats} toSats
  * @prop {TxCreate} create
@@ -133,34 +135,56 @@ var DashTx = ("object" === typeof module && exports) || {};
     25; // lockscript
 
   Tx.appraise = function (txInfo) {
+    let extraSize = Tx._appraiseMemos(txInfo.outputs);
+    let fees = Tx._appraiseCounts(
+      txInfo.inputs.length,
+      txInfo.outputs.length,
+      extraSize,
+    );
+
+    return fees;
+  };
+
+  Tx._appraiseCounts = function (numInputs, numOutputs, extraSize) {
     let min = Tx._HEADER_ONLY_SIZE;
 
-    min += Tx.utils.toVarIntSize(txInfo.inputs.length);
-    min += Tx.MIN_INPUT_SIZE * txInfo.inputs.length;
+    min += Tx.utils.toVarIntSize(numInputs);
+    min += Tx.MIN_INPUT_SIZE * numInputs;
 
-    min += Tx.utils.toVarIntSize(txInfo.outputs.length);
-    for (let output of txInfo.outputs) {
-      if (output.memo) {
-        let memoSize = output.memo.length / 2;
-        if (memoSize > MAX_U8) {
-          min += 2;
-        } else if (memoSize >= OP_PUSHDATA1_INT) {
-          min += 1;
-        }
-        min += OP_RETURN_HEADER_SIZE + memoSize;
-        continue;
-      }
-      min += Tx.OUTPUT_SIZE;
+    min += Tx.utils.toVarIntSize(numOutputs);
+    if (extraSize) {
+      min += extraSize; // memos, etc
     }
 
-    let maxPadding = Tx.MAX_INPUT_PAD * txInfo.inputs.length;
+    let maxPadding = Tx.MAX_INPUT_PAD * numInputs;
     let max = min + maxPadding;
 
     let spread = max - min;
     let halfSpread = Math.ceil(spread / 2);
     let mid = min + halfSpread;
 
-    return { min: min, mid: mid, max: max };
+    let fees = { min, mid, max };
+    return fees;
+  };
+
+  Tx._appraiseMemos = function (outputs) {
+    let size = 0;
+
+    for (let output of outputs) {
+      if (output.memo) {
+        let memoSize = output.memo.length / 2;
+        if (memoSize > MAX_U8) {
+          size += 2;
+        } else if (memoSize >= OP_PUSHDATA1_INT) {
+          size += 1;
+        }
+        size += OP_RETURN_HEADER_SIZE + memoSize;
+        continue;
+      }
+      size += Tx.OUTPUT_SIZE;
+    }
+
+    return size;
   };
 
   Tx.toDash = function (satoshis) {
@@ -1390,6 +1414,20 @@ if ("object" === typeof module) {
  * @callback TxAppraise
  * @param {TxInfo} txInfo
  * @returns {TxFees}
+ */
+
+/**
+ * @callback TxAppraiseCounts
+ * @param {Uint32} numInputs
+ * @param {Uint32} numOutputs
+ * @param {Uint32} [extraSize] - for memos
+ * @returns {TxFees}
+ */
+
+/**
+ * @callback TxAppraiseMemos
+ * @param {Array<TxOutput>} outputs
+ * @returns {Uint32}
  */
 
 /**
