@@ -28,6 +28,7 @@
  * @prop {Function} _createKeyUtils
  * @prop {Function} _hash
  * @prop {Function} _hashAndSignAll
+ * @prop {Function} _createMemoScript
  */
 
 /**
@@ -214,7 +215,6 @@ var DashTx = ("object" === typeof module && exports) || {};
    * the smallest coin that is bigger or equal to the amount sent + fees,
    * or the largest available coins until that total is met.
    */
-  //@ts-ignore
   Tx.createLegacyTx = async function (coins, outputs, changeOutput) {
     // TODO bump to 4 for DIP: enforce tx hygiene
     let version = CURRENT_VERSION;
@@ -234,7 +234,6 @@ var DashTx = ("object" === typeof module && exports) || {};
     // requires at least one input
     taxes += Tx.MAX_INPUT_SIZE;
 
-    //@ts-ignore
     let subtotal = Tx.sum(outputs);
     let total = subtotal + taxes;
 
@@ -251,7 +250,6 @@ var DashTx = ("object" === typeof module && exports) || {};
       }
 
       if (biggerOrEqual.length) {
-        //@ts-ignore - not undefined because we just length
         input = biggerOrEqual.pop();
       }
 
@@ -311,7 +309,7 @@ var DashTx = ("object" === typeof module && exports) || {};
 
     return txInfo;
   };
-  //@ts-ignore
+  //@ts-ignore - old usage - TODO REMOVE for v1
   Tx.legacyCreateTx = Tx.createLegacyTx;
 
   Tx.sortBySatsAsc = function (a, b) {
@@ -481,16 +479,16 @@ var DashTx = ("object" === typeof module && exports) || {};
     /** @type {TxGetPublicKey} */
     async function getPublicKey(txInput, i, txInputs) {
       let privKey = keys[i];
-      //@ts-ignore
+      if (!myUtils.toPublicKey) {
+        throw new Error("type assert: missing 'toPublicKey'");
+      }
       let pubKey = myUtils.toPublicKey(privKey);
       if ("string" === typeof pubKey) {
         console.warn(
           "oops, you gave a publicKey as hex (deprecated) rather than a buffer",
         );
-        //@ts-ignore
         pubKey = Tx.utils.hexToBytes(pubKey);
       }
-      //@ts-ignore
       return pubKey;
     }
 
@@ -533,12 +531,15 @@ var DashTx = ("object" === typeof module && exports) || {};
       }
     }
 
+    /** @type {TxInfoSigned} */
     let txInfoSigned = {
-      /** @type {Array<TxInputHashable|TxInputSigned>} */
+      /** @type {Array<TxInputSigned>} */
       inputs: [],
       outputs: txInfo.outputs,
       version: txInfo.version || CURRENT_VERSION,
+      //@ts-ignore - debug only
       _DANGER_donate: txInfo._DANGER_donate,
+      //@ts-ignore
       _donation_memo: txInfo._donation_memo,
     };
 
@@ -549,11 +550,14 @@ var DashTx = ("object" === typeof module && exports) || {};
 
     // temp shim
     if (!myUtils.getPublicKey) {
-      //@ts-ignore
       myUtils.getPublicKey = async function (txInput, i, inputs) {
-        //@ts-ignore
+        if (!myUtils.getPrivateKey) {
+          throw new Error("type assert: missing 'getPrivateKey'");
+        }
         let privKey = await myUtils.getPrivateKey(txInput, i, inputs);
-        //@ts-ignore
+        if (!myUtils.toPublicKey) {
+          throw new Error("type assert: missing 'toPublicKey'");
+        }
         let pubKey = await myUtils.toPublicKey(privKey);
         if ("string" === typeof pubKey) {
           throw new Error("publicKey must be given as a Uint8Array");
@@ -569,7 +573,6 @@ var DashTx = ("object" === typeof module && exports) || {};
       let _sigHashType = txInput.sigHashType ?? sigHashType;
       let txHashable = Tx.createHashable(txInfo, i);
       let txHashBuf = await Tx.hashPartial(txHashable, _sigHashType);
-      //@ts-ignore
       let privKey = await myUtils.getPrivateKey(txInput, i, txInfo.inputs);
 
       let sigBuf = await myUtils.sign(privKey, txHashBuf);
@@ -581,7 +584,6 @@ var DashTx = ("object" === typeof module && exports) || {};
 
       let pubKeyHex = txInput.publicKey;
       if (!pubKeyHex) {
-        //@ts-ignore
         let pubKey = await myUtils.getPublicKey(txInput, i, txInfo.inputs);
         pubKeyHex = Tx.utils.bytesToHex(pubKey);
       }
@@ -594,6 +596,7 @@ var DashTx = ("object" === typeof module && exports) || {};
         pubKeyHex = Tx.utils.bytesToHex(pubKeyHex);
       }
 
+      /** @type TxInputSigned */
       let txInputSigned = {
         txId: txInput.txId,
         outputIndex: txInput.outputIndex,
@@ -604,11 +607,13 @@ var DashTx = ("object" === typeof module && exports) || {};
 
       // expose _actual_ values used, for debugging
       let txHashHex = Tx.utils.bytesToHex(txHashBuf);
-      txInput._hash = txHashHex;
-      txInput._signature = sigHex.toString();
-      txInput._lockScript = txInfo.inputs[i].script;
-      txInput._publicKey = pubKeyHex;
-      txInput._sigHashType = _sigHashType;
+      Object.assign({
+        _hash: txHashHex,
+        _signature: sigHex.toString(),
+        _lockScript: txInfo.inputs[i].script,
+        _publicKey: pubKeyHex,
+        _sigHashType: _sigHashType,
+      });
 
       txInfoSigned.inputs[i] = txInputSigned;
     }
@@ -616,6 +621,7 @@ var DashTx = ("object" === typeof module && exports) || {};
     let transaction = Tx.createSigned(txInfoSigned);
 
     return {
+      //@ts-ignore - tsc doesn't support an enum here
       inputs: txInfo.inputs,
       locktime: txInfo.locktime || 0x0,
       outputs: txInfo.outputs,
@@ -640,7 +646,6 @@ var DashTx = ("object" === typeof module && exports) || {};
   Tx.createHashable = function (txInfo, inputIndex) {
     let txInfoHashable = Object.assign({}, txInfo);
     /** @type {Array<TxInputRaw|TxInputHashable>} */
-    //@ts-ignore
     txInfoHashable.inputs = txInfo.inputs.map(function (input, i) {
       if (inputIndex !== i) {
         return {
@@ -691,7 +696,9 @@ var DashTx = ("object" === typeof module && exports) || {};
     outputs,
     /* maxFee = 10000, */
     _debug = false,
+    //@ts-ignore - debug only
     _DANGER_donate = false,
+    //@ts-ignore
     _donation_memo,
   }) {
     let sep = "";
@@ -716,9 +723,7 @@ var DashTx = ("object" === typeof module && exports) || {};
       let inputHex = [];
       // txMap.inputs.push(inputHex);
 
-      //@ts-ignore
       let txId = input.txId;
-
       if (!txId) {
         throw new Error("missing required utxo property 'txid'");
       }
@@ -734,7 +739,6 @@ var DashTx = ("object" === typeof module && exports) || {};
       let reverseTxId = Tx.utils.reverseHex(txId);
       inputHex.push(reverseTxId);
 
-      //@ts-ignore
       let voutIndex = input.outputIndex;
       if (isNaN(voutIndex)) {
         throw new Error(
@@ -744,19 +748,27 @@ var DashTx = ("object" === typeof module && exports) || {};
       let reverseVout = toUint32LE(voutIndex);
       inputHex.push(reverseVout);
 
+      //@ts-ignore - enum types not handled properly here
       if (input.signature) {
+        //@ts-ignore
         let sigHashTypeVar = Tx.utils.toVarInt(input.sigHashType);
+        //@ts-ignore
         let sig = `${input.signature}${sigHashTypeVar}`;
         let sigSize = Tx.utils.toVarInt(sig.length / 2);
 
+        //@ts-ignore
         let keySize = Tx.utils.toVarInt(input.publicKey.length / 2);
+        //@ts-ignore
         let sigScript = `${sigSize}${sig}${keySize}${input.publicKey}`;
         let sigScriptLen = sigScript.length / 2;
         let sigScriptLenSize = Tx.utils.toVarInt(sigScriptLen);
         inputHex.push(sigScriptLenSize);
         inputHex.push(sigScript);
+        //@ts-ignore
       } else if (input.script) {
+        //@ts-ignore
         let lockScript = input.script;
+        //@ts-ignore
         let lockScriptLen = input.script.length / 2;
         let lockScriptLenSize = Tx.utils.toVarInt(lockScriptLen);
         inputHex.push(lockScriptLenSize);
@@ -867,7 +879,6 @@ var DashTx = ("object" === typeof module && exports) || {};
    * @param {String} memoHex - the memo bytes, in hex
    * @returns {Array<String>} - memo script hex
    */
-  //@ts-ignore
   Tx._createMemoScript = function (memoHex, i = 0) {
     let outputHex = [];
     let satoshis = toUint64LE(0);
@@ -1079,10 +1090,7 @@ var DashTx = ("object" === typeof module && exports) || {};
     return sigBuf;
   };
 
-  /**
-   * @param {Uint8Array} privateKey
-   * @returns {String} - pubKeyHash in the raw (hex)
-   */
+  /** @type TxToPublicKey */
   TxUtils.toPublicKey = function (privateKey) {
     let Secp256k1 =
       //@ts-ignore
@@ -1093,6 +1101,7 @@ var DashTx = ("object" === typeof module && exports) || {};
     return pubKeyBuf;
   };
 
+  /** @type TxToVarInt */
   TxUtils.toVarInt = function (n) {
     //@ts-ignore - see https://github.com/microsoft/TypeScript/issues/57953
     if (n < 253) {
@@ -1119,8 +1128,7 @@ var DashTx = ("object" === typeof module && exports) || {};
 
     if ("bigint" !== typeof n) {
       let err = new Error(E_LITTLE_INT);
-      //@ts-ignore
-      err.code = "E_LITTLE_INT";
+      Object.assign(err, { code: "E_LITTLE_INT" });
       throw err;
     }
 
@@ -1129,8 +1137,7 @@ var DashTx = ("object" === typeof module && exports) || {};
     }
 
     let err = new Error(E_TOO_BIG_INT);
-    //@ts-ignore
-    err.code = "E_TOO_BIG_INT";
+    Object.assign(err, { code: "E_TOO_BIG_INT" });
     throw err;
   };
 
@@ -1182,6 +1189,7 @@ var DashTx = ("object" === typeof module && exports) || {};
     return hex;
   }
 
+  /** @type TxToVarIntSize */
   TxUtils.toVarIntSize = function (n) {
     //@ts-ignore - see https://github.com/microsoft/TypeScript/issues/57953
     if (n < 253) {
@@ -1204,16 +1212,11 @@ var DashTx = ("object" === typeof module && exports) || {};
     }
 
     let err = new Error(E_TOO_BIG_INT);
-    //@ts-ignore
-    err.code = "E_TOO_BIG_INT";
+    Object.assign(err, { code: "E_TOO_BIG_INT" });
     throw err;
   };
 
-  /**
-   * @param {Uint8Array} u8
-   * @returns {String} hex
-   */
-  //@ts-ignore
+  /** @type {TxBytesToHex} */
   TxUtils.bytesToHex = function (u8) {
     /** @type {Array<String>} */
     let hex = [];
@@ -1227,6 +1230,7 @@ var DashTx = ("object" === typeof module && exports) || {};
   };
   TxUtils.u8ToHex = TxUtils.bytesToHex;
 
+  /** @type {TxStringToHex} */
   TxUtils.strToHex = function (str) {
     let encoder = new TextEncoder();
     let bytes = encoder.encode(str);
@@ -1259,7 +1263,7 @@ if ("object" === typeof module) {
 /**
  * @typedef TxDeps
  * @prop {TxSign} sign
- * @prop {TxToPublicKey} [toPublicKey] - deprecated
+ * @prop {TxToPublicKey} [toPublicKey]
  * @prop {TxGetPrivateKey} [getPrivateKey]
  * @prop {TxGetPublicKey} [getPublicKey]
  */
@@ -1425,7 +1429,7 @@ if ("object" === typeof module) {
  * @param {TxInputHashable} txInput
  * @param {Uint53} i
  * @param {Array<TxInputRaw|TxInputHashable>} txInputs
- * @returns {Uint8Array} - private key Uint8Array
+ * @returns {Promise<TxPrivateKey>} - private key Uint8Array
  */
 
 /**
@@ -1433,7 +1437,7 @@ if ("object" === typeof module) {
  * @param {TxInputHashable} txInput
  * @param {Uint53} i
  * @param {Array<TxInputRaw|TxInputHashable>} txInputs
- * @returns {Uint8Array} - public key Uint8Array
+ * @returns {Promise<TxPublicKey>} - public key Uint8Array
  */
 
 /**
@@ -1460,7 +1464,7 @@ if ("object" === typeof module) {
  * @param {Array<TxInputUnspent>} coins
  * @param {Array<TxOutput>} outputs
  * @param {TxOutput} changeOutput - object with 0 satoshis and change address, pubKeyHash, or script
- * @returns {TxInfo}
+ * @returns {Promise<TxInfo>}
  */
 
 /**
@@ -1473,7 +1477,7 @@ if ("object" === typeof module) {
  * @callback TxSign
  * @param {TxPrivateKey} privateKey
  * @param {Uint8Array} txHashBytes
- * @returns {TxSignature} - buf
+ * @returns {Promise<TxSignature>} - buf
  */
 
 /**
