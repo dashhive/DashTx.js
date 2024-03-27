@@ -1,13 +1,13 @@
 /**
  * @typedef Tx
- * @prop {Number} SATOSHIS
- * @prop {Number} _HEADER_ONLY_SIZE
- * @prop {Number} HEADER_SIZE
- * @prop {Number} LEGACY_DUST
- * @prop {Number} MIN_INPUT_SIZE - 147 each
- * @prop {Number} MAX_INPUT_PAD - 2 (possible ASN.1 BigInt padding)
- * @prop {Number} MAX_INPUT_SIZE - 149 each (with padding)
- * @prop {Number} OUTPUT_SIZE - 34 each
+ * @prop {Uint53} SATOSHIS
+ * @prop {Uint32} _HEADER_ONLY_SIZE
+ * @prop {Uint32} HEADER_SIZE
+ * @prop {Uint32} LEGACY_DUST
+ * @prop {Uint32} MIN_INPUT_SIZE - 147 each
+ * @prop {Uint32} MAX_INPUT_PAD - 2 (possible ASN.1 BigInt padding)
+ * @prop {Uint32} MAX_INPUT_SIZE - 149 each (with padding)
+ * @prop {Uint32} OUTPUT_SIZE - 34 each
  * @prop {TxAppraise} appraise
  * @prop {TxToDash} toDash
  * @prop {TxToSats} toSats
@@ -71,7 +71,7 @@ var DashTx = ("object" === typeof module && exports) || {};
   const MAX_U8 = Math.pow(2, 8) - 1;
   const MAX_U16 = Math.pow(2, 16) - 1;
   const MAX_U32 = Math.pow(2, 32) - 1;
-  const MAX_U52 = Number.MAX_SAFE_INTEGER;
+  const MAX_U53 = Number.MAX_SAFE_INTEGER; // Math.pow(2, 53) - 1
   const MAX_U64 = 2n ** 64n - 1n;
 
   const CH_0 = 48;
@@ -95,7 +95,7 @@ var DashTx = ("object" === typeof module && exports) || {};
   const PKH_SCRIPT_SIZE = (25).toString(16); // 0x19
 
   const E_LITTLE_INT =
-    "JavaScript 'Number's only go up to uint51, you must use 'BigInt' (ex: `let amount = 18014398509481984n`) for larger values";
+    "JavaScript 'Number's only go up to uint53, you must use 'BigInt' (ex: `let amount = 18014398509481984n`) for larger values";
   const E_TOO_BIG_INT =
     "JavaScript 'BigInt's are arbitrarily large, but you may only use up to UINT64 for transactions";
 
@@ -378,7 +378,7 @@ var DashTx = ("object" === typeof module && exports) || {};
    *
    * @param {TxOutputSortable} a
    * @param {TxOutputSortable} b
-   * @returns {Number}
+   * @returns {Uint32}
    */
   Tx.sortOutputs = function (a, b) {
     // the complexity is inherent, and doesn't seem to be reasonable to break out
@@ -501,7 +501,7 @@ var DashTx = ("object" === typeof module && exports) || {};
    * @param {TxInfo} txInfo
    * TODO _param {Array<TxInputRaw>} txInfo.inputs - needs type narrowing check
    * TODO _param {Array<TxOutput>} txInfo.outputs
-   * TODO _param {Number} [txInfo.version]
+   * TODO _param {Uint32} [txInfo.version]
    * TODO _param {Boolean} [txInfo._debug] - bespoke debug output
    * @param {TxDeps} myUtils
    * @returns {Promise<TxInfoSigned>}
@@ -679,9 +679,9 @@ var DashTx = ("object" === typeof module && exports) || {};
   /**
    * @param {Object} opts
    * @param {Array<TxInputRaw|TxInputHashable|TxInputSigned>} opts.inputs
-   * @param {Number} [opts.locktime]
+   * @param {Uint32} [opts.locktime]
    * @param {Array<TxOutput>} opts.outputs
-   * @param {Number} [opts.version]
+   * @param {Uint32} [opts.version]
    * @param {Boolean} [opts._debug] - bespoke debug output
    */
   Tx._create = function ({
@@ -936,7 +936,7 @@ var DashTx = ("object" === typeof module && exports) || {};
     let reverseU8 = new Uint8Array(hashU8.length);
     let reverseIndex = reverseU8.length - 1;
     hashU8.forEach(
-      /** @param {Number} b */
+      /** @param {Uint8} b */
       function (b) {
         reverseU8[reverseIndex] = b;
         reverseIndex -= 1;
@@ -1093,10 +1093,6 @@ var DashTx = ("object" === typeof module && exports) || {};
     return pubKeyBuf;
   };
 
-  /**
-   * Caution: JS can't handle 64-bit ints
-   * @param {BigInt|Number} n - 64-bit BigInt or < 52-bit Number
-   */
   TxUtils.toVarInt = function (n) {
     //@ts-ignore - see https://github.com/microsoft/TypeScript/issues/57953
     if (n < 253) {
@@ -1117,7 +1113,7 @@ var DashTx = ("object" === typeof module && exports) || {};
     }
 
     //@ts-ignore
-    if (n <= MAX_U52) {
+    if (n <= MAX_U53) {
       return "ff" + toUint64LE(n);
     }
 
@@ -1144,7 +1140,7 @@ var DashTx = ("object" === typeof module && exports) || {};
    * @param {BigInt|Number} n - 32-bit positive int to encode
    */
   function toUint32LE(n) {
-    // make sure n is uint32/int52, not int32
+    // make sure n is uint32/int53, not int32
     //n = n >>> 0;
 
     // 0x00000003
@@ -1157,7 +1153,7 @@ var DashTx = ("object" === typeof module && exports) || {};
   /**
    * This can handle Big-Endian CPUs, which don't exist,
    * and looks too complicated.
-   * @param {BigInt|Number} n - 64-bit BigInt or <= 51-bit Number to encode
+   * @param {BigInt|Number} n - 64-bit BigInt or <= 53-bit Number to encode
    * @returns {String} - 8 Little-Endian bytes
    */
   function toUint64LE(n) {
@@ -1186,10 +1182,6 @@ var DashTx = ("object" === typeof module && exports) || {};
     return hex;
   }
 
-  /**
-   * @param {BigInt|Number} n
-   * @returns {Number}
-   */
   TxUtils.toVarIntSize = function (n) {
     //@ts-ignore - see https://github.com/microsoft/TypeScript/issues/57953
     if (n < 253) {
@@ -1257,6 +1249,7 @@ if ("object" === typeof module) {
 /** @typedef {Number} Float64 */
 /** @typedef {Number} Uint53 */
 /** @typedef {Number} Uint32 */
+/** @typedef {Number} Uint8 */
 /** @typedef {Uint8Array} TxPrivateKey */
 /** @typedef {Uint8Array} TxPublicKey */
 /** @typedef {Uint8Array} TxSignature */
@@ -1273,17 +1266,17 @@ if ("object" === typeof module) {
 
 /**
  * @typedef TxFees
- * @prop {Number} max
- * @prop {Number} mid
- * @prop {Number} min
+ * @prop {Uint53} max
+ * @prop {Uint53} mid
+ * @prop {Uint53} min
  */
 
 /**
  * @typedef TxInfo
  * @prop {Array<TxInputHashable>} inputs
- * @prop {Number} [locktime] - 0 by default
+ * @prop {Uint32} [locktime] - 0 by default
  * @prop {Array<TxOutput>} outputs
- * @prop {Number} [version]
+ * @prop {Uint32} [version]
  * @prop {String} [transaction] - signed transaction hex
  * @prop {Boolean} [_debug] - bespoke debug output
  */
@@ -1291,9 +1284,9 @@ if ("object" === typeof module) {
 /**
  * @typedef TxInfoSigned
  * @prop {Array<TxInputSigned>} inputs
- * @prop {Number} locktime - 0 by default
+ * @prop {Uint32} locktime - 0 by default
  * @prop {Array<TxOutput>} outputs
- * @prop {Number} version
+ * @prop {Uint32} version
  * @prop {String} transaction - signed transaction hex
  * @prop {Boolean} [_debug] - bespoke debug output
  */
@@ -1302,52 +1295,52 @@ if ("object" === typeof module) {
  * @typedef TxInput
  * @prop {String} [address] - BaseCheck58-encoded pubKeyHash
  * @prop {String} txId - hex (not pre-reversed)
- * @prop {Number} outputIndex - index in previous tx's output (vout index)
+ * @prop {Uint32} outputIndex - index in previous tx's output (vout index)
  * @prop {String} signature - hex-encoded ASN.1 (DER) signature (starts with 0x30440220 or  0x30440221)
  * @prop {String} [script] - the previous lock script (default: derived from public key as p2pkh)
  * @prop {String} publicKey - hex-encoded public key (typically starts with a 0x02 or 0x03 prefix)
  * @prop {String} [pubKeyHash] - the 20-byte pubKeyHash (address without magic byte or checksum)
- * @prop {Number} sigHashType - typically 0x01 (SIGHASH_ALL)
+ * @prop {Uint32} sigHashType - typically 0x01 (SIGHASH_ALL)
  */
 
 /**
  * @typedef TxInputHashable
  * @prop {String} [address] - BaseCheck58-encoded pubKeyHash
  * @prop {String} txId - hex (not pre-reversed)
- * @prop {Number} outputIndex - index in previous tx's output (vout index)
- * @prop {Number} [satoshis] - (included for convenience as type hack)
+ * @prop {Uint32} outputIndex - index in previous tx's output (vout index)
+ * @prop {Uint53} [satoshis] - (included for convenience as type hack)
  * @prop {String} [signature] - (included as type hack)
  * @prop {String} [script] - the previous lock script (default: derived from public key as p2pkh)
  * @prop {String} [publicKey] - hex-encoded public key (typically starts with a 0x02 or 0x03 prefix)
  * @prop {String} [pubKeyHash] - the 20-byte pubKeyHash (address without magic byte or checksum)
- * @prop {Number} [sigHashType] - typically 0x01 (SIGHASH_ALL)
+ * @prop {Uint32} [sigHashType] - typically 0x01 (SIGHASH_ALL)
  */
 
 /**
  * @typedef TxInputRaw
  * @prop {String} [address] - BaseCheck58-encoded pubKeyHash
- * @prop {Number} [satoshis] - for convenience
+ * @prop {Uint53} [satoshis] - for convenience
  * @prop {String} txId - hex (not pre-reversed)
- * @prop {Number} outputIndex - index in previous tx's output (vout index)
+ * @prop {Uint32} outputIndex - index in previous tx's output (vout index)
  */
 
 /**
  * @typedef TxInputUnspent
  * @prop {String} [address] - BaseCheck58-encoded pubKeyHash
- * @prop {Number} satoshis
+ * @prop {Uint53} satoshis
  * @prop {String} txId - hex (not pre-reversed)
- * @prop {Number} outputIndex - index in previous tx's output (vout index)
+ * @prop {Uint32} outputIndex - index in previous tx's output (vout index)
  */
 
 /**
  * @typedef TxInputSortable
  * @prop {String} txId
- * @prop {Number} outputIndex
+ * @prop {Uint32} outputIndex
  */
 
 /**
  * @typedef TxHasSats
- * @prop {Number} satoshis
+ * @prop {Uint53} satoshis
  */
 
 /**
@@ -1359,12 +1352,12 @@ if ("object" === typeof module) {
  * @prop {String} [memo] - hex bytes of a memo (incompatible with pubKeyHash / address)
  * @prop {String} [address] - payAddr as Base58Check (human-friendly)
  * @prop {String} [pubKeyHash] - payAddr's raw hex value (decoded, not Base58Check)
- * @prop {Number} satoshis - the number of smallest units of the currency
+ * @prop {Uint53} satoshis - the number of smallest units of the currency
  */
 
 /**
  * @typedef TxOutputSortable
- * @prop {Number} satoshis
+ * @prop {Uint53} satoshis
  * @prop {String} [script] - hex bytes in wire order
  * @prop {String} [memo] - 0x6a, hex bytes
  * @prop {String} [pubKeyHash] - 0x76, 0xa9, hex bytes
@@ -1398,7 +1391,7 @@ if ("object" === typeof module) {
 /**
  * @callback TxCreateHashable
  * @param {TxInfo} txInfo
- * @param {Number} inputIndex - create hashable tx for this input
+ * @param {Uint32} inputIndex - create hashable tx for this input
  * @returns {String} - hashable tx hex
  */
 
@@ -1407,7 +1400,7 @@ if ("object" === typeof module) {
  * @param {Object} opts
  * @param {Array<TxInputRaw>} opts.inputs
  * @param {Array<TxOutput>} opts.outputs
- * @param {Number} [opts.version]
+ * @param {Uint32} [opts.version]
  * @param {Boolean} [opts._debug] - bespoke debug output
  */
 
@@ -1416,7 +1409,7 @@ if ("object" === typeof module) {
  * @param {Object} opts
  * @param {Array<TxInputSigned>} opts.inputs
  * @param {Array<TxOutput>} opts.outputs
- * @param {Number} [opts.version]
+ * @param {Uint32} [opts.version]
  * @param {Boolean} [opts._debug] - bespoke debug output
  * xparam {String} [opts.sigHashType] - hex, typically 01 (ALL)
  */
@@ -1430,7 +1423,7 @@ if ("object" === typeof module) {
 /**
  * @callback TxGetPrivateKey
  * @param {TxInputHashable} txInput
- * @param {Number} i
+ * @param {Uint53} i
  * @param {Array<TxInputRaw|TxInputHashable>} txInputs
  * @returns {Uint8Array} - private key Uint8Array
  */
@@ -1438,7 +1431,7 @@ if ("object" === typeof module) {
 /**
  * @callback TxGetPublicKey
  * @param {TxInputHashable} txInput
- * @param {Number} i
+ * @param {Uint53} i
  * @param {Array<TxInputRaw|TxInputHashable>} txInputs
  * @returns {Uint8Array} - public key Uint8Array
  */
@@ -1452,7 +1445,7 @@ if ("object" === typeof module) {
 /**
  * @callback TxHashPartial
  * @param {String} txHex - signable tx hex (like raw tx, but with (lock)script)
- * @param {Number} sigHashType - typically 0x01 (SIGHASH_ALL) for signable
+ * @param {Uint32} sigHashType - typically 0x01 (SIGHASH_ALL) for signable
  * @returns {Promise<Uint8Array>}
  */
 
@@ -1487,39 +1480,39 @@ if ("object" === typeof module) {
  * @callback TxSortBySats
  * @param {TxHasSats} a
  * @param {TxHasSats} b
- * @returns {Number}
+ * @returns {Uint8}
  */
 
 /**
  * @callback TxSortInputs
  * @param {TxInputSortable} a
  * @param {TxInputSortable} b
- * @returns {Number}
+ * @returns {Uint8}
  */
 
 /**
  * @callback TxSortOutputs
  * @param {TxOutputSortable} a
  * @param {TxOutputSortable} b
- * @returns {Number}
+ * @returns {Uint8}
  */
 
 /**
  * @callback TxSum
  * @param {Array<TxHasSats>} coins
- * @returns {Number}
+ * @returns {Uint53}
  */
 
 /**
  * @callback TxToDash
- * @param {Number} satoshis
- * @returns {Number} - float
+ * @param {Uint53} satoshis
+ * @returns {Float64} - float
  */
 
 /**
  * @callback TxToSats
- * @param {Number} dash - as float (decimal) DASH, not uint satoshis
- * @returns {Number} - duffs
+ * @param {Float64} dash - as float (decimal) DASH, not uint satoshis
+ * @returns {Uint53} - duffs
  */
 
 /**
@@ -1529,15 +1522,16 @@ if ("object" === typeof module) {
  */
 
 /**
+ * Caution: JS can't handle 64-bit ints
  * @callback TxToVarInt
- * @param {Number} n
+ * @param {BigInt|Uint53} n - 64-bit BigInt or < 53-bit Number
  * @returns {String} - hex
  */
 
 /**
  * @callback TxToVarIntSize
- * @param {Number} n
- * @returns {Number} - byte size of n
+ * @param {BigInt|Uint53} n
+ * @returns {Uint8} - byte size of n
  */
 
 /**
