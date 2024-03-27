@@ -203,16 +203,17 @@ var DashTx = ("object" === typeof module && exports) || {};
   };
 
   Tx.create = function (myUtils) {
-    myUtils = Object.assign({}, Tx.utils, myUtils);
+    let txInst = {};
+
+    txInst._utils = Object.assign({}, Tx.utils, myUtils);
 
     /** @type {TxHashAndSignAll} */
-    async function hashAndSignAll(txInfo, keys) {
-      let _myUtils = myUtils;
+    txInst.hashAndSignAll = async function (txInfo, keys) {
       if (keys) {
         //@ts-ignore
         if (keys.getPrivateKey) {
           //@ts-ignore
-          _myUtils.getPrivateKey = keys.getPrivateKey;
+          txInst._utils.getPrivateKey = keys.getPrivateKey;
         }
         //@ts-ignore
         else if (keys.length !== txInfo.inputs.length) {
@@ -220,17 +221,13 @@ var DashTx = ("object" === typeof module && exports) || {};
             `the number and order of 'keys' must match number of 'inputs' - each 'utxo' of the provided private key must be matched to that private key`,
           );
         } else {
-          _myUtils = Tx._createKeyUtils(myUtils, keys);
+          txInst._utils = Tx._createKeyUtils(txInst._utils, keys);
         }
       }
 
-      return await Tx._hashAndSignAll(txInfo, _myUtils);
-    }
-
-    let txInst = {
-      _utils: myUtils,
-      hashAndSignAll: hashAndSignAll,
+      return await Tx._hashAndSignAll(txInfo, txInst._utils);
     };
+
     return txInst;
   };
 
