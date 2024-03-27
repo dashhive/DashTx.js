@@ -5,7 +5,7 @@ on:
   pull_request:
 jobs:
   build:
-    name: Node.js build: fmt, ci, lint, test
+    name: 'Node.js build: fmt, ci, lint, test'
     runs-on: ubuntu-latest
     strategy:
       matrix:
