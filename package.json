@@ -2,7 +2,7 @@
   "name": "dashtx",
   "version": "0.13.3",
   "description": "Create DASH Transactions with Vanilla JS (0 deps, cross-platform)",
-  "main": "dashtx.js",
+  "main": "index.js",
   "files": [
     "index.js",
     "dashtx.js",
@@ -22,7 +22,7 @@
     "prepublish": "npx -p jswt@1.x -- reexport",
     "test": "node ./tests/",
     "--------------": "-----------------------------------------------",
-    "jshint": "npx -p jshint@2.x -- jshint -c ./.jshintrc ./*.js ./lib",
+    "jshint": "npx -p jshint@2.x -- jshint -c ./.jshintrc ./*.js",
     "prettier": "npx -p prettier@2.x -- prettier -w '**/*.{js,md}'",
     "reexport-types": "npx -p jswt@1.x -- reexport",
     "tsc": "npx -p typescript@4.x -- tsc -p ./jsconfig.json"
