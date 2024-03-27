@@ -4,13 +4,10 @@
  * @prop {Number} _HEADER_ONLY_SIZE
  * @prop {Number} HEADER_SIZE
  * @prop {Number} LEGACY_DUST
- * @prop {bigint} _BIG_LEGACY_DUST
  * @prop {Number} MIN_INPUT_SIZE - 147 each
  * @prop {Number} MAX_INPUT_PAD - 2 (possible ASN.1 BigInt padding)
  * @prop {Number} MAX_INPUT_SIZE - 149 each (with padding)
- * @prop {bigint} _BIG_MAX_INPUT_SIZE
  * @prop {Number} OUTPUT_SIZE - 34 each
- * @prop {bigint} _BIG_OUTPUT_SIZE
  * @prop {TxAppraise} appraise
  * @prop {TxToDash} toDash
  * @prop {TxToSats} toSats
@@ -68,8 +65,6 @@ var DashTx = ("object" === typeof module && exports) || {};
 
   let TxUtils = {};
 
-  const BIG_ZERO = 0n;
-
   const VERSION = 3;
   const SATOSHIS = 100000000;
 
@@ -106,7 +101,6 @@ var DashTx = ("object" === typeof module && exports) || {};
 
   Tx.SATOSHIS = SATOSHIS;
   Tx.LEGACY_DUST = 2000;
-  Tx._BIG_LEGACY_DUST = BigInt(Tx.LEGACY_DUST);
 
   Tx._HEADER_ONLY_SIZE =
     4 + // version
@@ -131,13 +125,11 @@ var DashTx = ("object" === typeof module && exports) || {};
     0; // Public Key value is NOT BigInt padded
 
   Tx.MAX_INPUT_SIZE = Tx.MIN_INPUT_SIZE + Tx.MAX_INPUT_PAD;
-  Tx._BIG_MAX_INPUT_SIZE = BigInt(Tx.MAX_INPUT_SIZE);
 
   Tx.OUTPUT_SIZE = // 34 each
     8 + // satoshis (base units) value
     1 + // lockscript size
     25; // lockscript
-  Tx._BIG_OUTPUT_SIZE = BigInt(Tx.OUTPUT_SIZE);
 
   Tx.appraise = function (txInfo) {
     let min = Tx._HEADER_ONLY_SIZE;
@@ -238,15 +230,15 @@ var DashTx = ("object" === typeof module && exports) || {};
     /** @type {Array<TxInputUnspent>} */
     let inputs = [];
     let fees = DashTx.appraise({ inputs, outputs });
-    let taxes = BigInt(fees.max);
+    let taxes = fees.max;
     // requires at least one input
-    taxes += Tx._BIG_MAX_INPUT_SIZE;
+    taxes += Tx.MAX_INPUT_SIZE;
 
     //@ts-ignore
     let subtotal = Tx.sum(outputs);
     let total = subtotal + taxes;
 
-    let cash = BIG_ZERO;
+    let cash = 0;
     /** @type {Array<TxInputUnspent>} */
     let biggerOrEqual = [];
     for (;;) {
@@ -267,7 +259,7 @@ var DashTx = ("object" === typeof module && exports) || {};
         break;
       }
 
-      let sats = BigInt(input.satoshis);
+      let sats = input.satoshis;
       cash += sats;
       inputs.push(input);
 
@@ -276,11 +268,11 @@ var DashTx = ("object" === typeof module && exports) || {};
       }
 
       // requires at least one more input
-      total += Tx._BIG_MAX_INPUT_SIZE;
+      total += Tx.MAX_INPUT_SIZE;
     }
 
     if (cash < total) {
-      total -= Tx._BIG_MAX_INPUT_SIZE;
+      total -= Tx.MAX_INPUT_SIZE;
       if (cash < totalBalance) {
         throw new Error(
           `developer error: did not use full balance of ${totalBalance} when calculating available balance of ${cash} to pay ${total}`,
@@ -291,13 +283,13 @@ var DashTx = ("object" === typeof module && exports) || {};
       );
     }
 
-    let change = BIG_ZERO;
-    let dust = cash + -total + -Tx._BIG_OUTPUT_SIZE;
-    if (dust >= Tx._BIG_LEGACY_DUST) {
+    let change = 0;
+    let dust = cash + -total + -Tx.OUTPUT_SIZE;
+    if (dust >= Tx.LEGACY_DUST) {
       change = dust;
       changeOutput.satoshis = change;
       outputs.push(changeOutput);
-      total += Tx._BIG_OUTPUT_SIZE;
+      total += Tx.OUTPUT_SIZE;
     }
 
     taxes = total - subtotal;
@@ -323,14 +315,14 @@ var DashTx = ("object" === typeof module && exports) || {};
   Tx.legacyCreateTx = Tx.createLegacyTx;
 
   Tx.sortBySatsAsc = function (a, b) {
-    let aSats = BigInt(a.satoshis);
-    let bSats = BigInt(b.satoshis);
+    let aSats = a.satoshis;
+    let bSats = b.satoshis;
 
     let diff = aSats - bSats;
-    if (diff > BIG_ZERO) {
+    if (diff > 0) {
       return 1;
     }
-    if (diff < BIG_ZERO) {
+    if (diff < 0) {
       return -1;
     }
 
@@ -338,14 +330,14 @@ var DashTx = ("object" === typeof module && exports) || {};
   };
 
   Tx.sortBySatsDsc = function (a, b) {
-    let aSats = BigInt(a.satoshis);
-    let bSats = BigInt(b.satoshis);
+    let aSats = a.satoshis;
+    let bSats = b.satoshis;
 
     let diff = aSats - bSats;
-    if (diff > BIG_ZERO) {
+    if (diff > 0) {
       return -1;
     }
-    if (diff < BIG_ZERO) {
+    if (diff < 0) {
       return 1;
     }
 
@@ -392,13 +384,13 @@ var DashTx = ("object" === typeof module && exports) || {};
     // the complexity is inherent, and doesn't seem to be reasonable to break out
     /* jshint maxcomplexity:30 */
 
-    let satsA = BigInt(a.satoshis);
-    let satsB = BigInt(b.satoshis);
+    let satsA = a.satoshis;
+    let satsB = b.satoshis;
     let sats = satsA - satsB;
-    if (sats < BIG_ZERO) {
+    if (sats < 0) {
       return -1;
     }
-    if (sats > BIG_ZERO) {
+    if (sats > 0) {
       return 1;
     }
 
@@ -925,9 +917,9 @@ var DashTx = ("object" === typeof module && exports) || {};
   };
 
   Tx.sum = function (coins) {
-    let balance = BIG_ZERO;
+    let balance = 0;
     for (let utxo of coins) {
-      let sats = BigInt(utxo.satoshis);
+      let sats = utxo.satoshis;
       balance += sats;
     }
 
@@ -1106,6 +1098,7 @@ var DashTx = ("object" === typeof module && exports) || {};
    * @param {BigInt|Number} n - 64-bit BigInt or < 52-bit Number
    */
   TxUtils.toVarInt = function (n) {
+    //@ts-ignore - see https://github.com/microsoft/TypeScript/issues/57953
     if (n < 253) {
       return n.toString(16).padStart(2, "0");
     }
@@ -1113,14 +1106,17 @@ var DashTx = ("object" === typeof module && exports) || {};
       throw new Error(`'${n}' is not a number`);
     }
 
+    //@ts-ignore
     if (n <= MAX_U16) {
       return "fd" + toUint32LE(n).slice(0, 4);
     }
 
+    //@ts-ignore
     if (n <= MAX_U32) {
       return "fe" + toUint32LE(n);
     }
 
+    //@ts-ignore
     if (n <= MAX_U52) {
       return "ff" + toUint64LE(n);
     }
@@ -1195,18 +1191,22 @@ var DashTx = ("object" === typeof module && exports) || {};
    * @returns {Number}
    */
   TxUtils.toVarIntSize = function (n) {
+    //@ts-ignore - see https://github.com/microsoft/TypeScript/issues/57953
     if (n < 253) {
       return 1;
     }
 
+    //@ts-ignore
     if (n <= MAX_U16) {
       return 3;
     }
 
+    //@ts-ignore
     if (n <= MAX_U32) {
       return 5;
     }
 
+    //@ts-ignore
     if (n <= MAX_U64) {
       return 9;
     }
@@ -1312,7 +1312,7 @@ if ("object" === typeof module) {
  * @prop {String} [address] - BaseCheck58-encoded pubKeyHash
  * @prop {String} txId - hex (not pre-reversed)
  * @prop {Number} outputIndex - index in previous tx's output (vout index)
- * @prop {Number|bigint} [satoshis] - (included for convenience as type hack)
+ * @prop {Number} [satoshis] - (included for convenience as type hack)
  * @prop {String} [signature] - (included as type hack)
  * @prop {String} [script] - the previous lock script (default: derived from public key as p2pkh)
  * @prop {String} [publicKey] - hex-encoded public key (typically starts with a 0x02 or 0x03 prefix)
@@ -1344,7 +1344,7 @@ if ("object" === typeof module) {
 
 /**
  * @typedef TxHasSats
- * @prop {Number|bigint} satoshis
+ * @prop {Number} satoshis
  */
 
 /**
@@ -1356,12 +1356,12 @@ if ("object" === typeof module) {
  * @prop {String} [memo] - hex bytes of a memo (incompatible with pubKeyHash / address)
  * @prop {String} [address] - payAddr as Base58Check (human-friendly)
  * @prop {String} [pubKeyHash] - payAddr's raw hex value (decoded, not Base58Check)
- * @prop {Number|bigint} satoshis - the number of smallest units of the currency
+ * @prop {Number} satoshis - the number of smallest units of the currency
  */
 
 /**
  * @typedef TxOutputSortable
- * @prop {Number|bigint} satoshis
+ * @prop {Number} satoshis
  * @prop {String} [script] - hex bytes in wire order
  * @prop {String} [memo] - 0x6a, hex bytes
  * @prop {String} [pubKeyHash] - 0x76, 0xa9, hex bytes
@@ -1504,7 +1504,7 @@ if ("object" === typeof module) {
 /**
  * @callback TxSum
  * @param {Array<TxHasSats>} coins
- * @returns {bigint}
+ * @returns {Number}
  */
 
 /**
@@ -1515,7 +1515,7 @@ if ("object" === typeof module) {
 
 /**
  * @callback TxToSats
- * @param {Number} dash - as float (decimal) DASH, not BigInt satoshis
+ * @param {Number} dash - as float (decimal) DASH, not uint satoshis
  * @returns {Number} - duffs
  */
 
