@@ -725,7 +725,7 @@ var DashTx = ("object" === typeof module && exports) || {};
 
       let txId = input.txId;
       if (!txId) {
-        throw new Error("missing required utxo property 'txid'");
+        throw new Error("missing required utxo property 'txId'");
       }
 
       if (64 !== txId.length) {
@@ -742,7 +742,7 @@ var DashTx = ("object" === typeof module && exports) || {};
       let voutIndex = input.outputIndex;
       if (isNaN(voutIndex)) {
         throw new Error(
-          "expected utxo property 'vout' to be an integer representing this input's previous output index",
+          "expected utxo property 'outputIndex' to be an integer representing this input's previous output index",
         );
       }
       let reverseVout = toUint32LE(voutIndex);
