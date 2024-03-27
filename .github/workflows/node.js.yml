@@ -1,10 +1,11 @@
 name: Node.js CI
 on:
   push:
-    branches: [ "main" ]
+    branches: ['main']
   pull_request:
 jobs:
   build:
+    name: Node.js build: fmt, ci, lint, test
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -12,11 +13,12 @@ jobs:
           - 20.x
           - latest
     steps:
-    - uses: actions/checkout@v3
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v3
-      with:
-        node-version: ${{ matrix.node-version }}
-    - run: npm run fmt
-    - run: npm ci
-    - run: npm test
+      - uses: actions/checkout@v3
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+      - run: npm run fmt
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run test
