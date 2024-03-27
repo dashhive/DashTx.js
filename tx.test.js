@@ -1,6 +1,8 @@
 "use strict";
 
-let Tx = require("./tx.js");
+let Tx = require("./");
+let toVarInt = Tx.utils.toVarInt;
+let toVarIntSize = Tx.utils.toVarIntSize;
 
 /** @type {import('node:crypto')} */
 //@ts-ignore
@@ -38,6 +40,7 @@ Secp256k1.utils.hmacSha256 = async function (key, message) {
   return new Uint8Array(buffer);
 };
 
+/* jshint maxstatements: 200 */
 async function main() {
   //let expectedBytes = "00ff0ff0fff00f00";
   //let u8 = Tx.utils.hexToU8("00ff0ff0fff00f00");
@@ -61,9 +64,8 @@ async function main() {
     ],
     outputs: [
       {
-        // TODO pubkeyhash or pubKeyHash, but NOT BOTH
-        pubkeyhash: "f93af105187d21ed6adfa5d71bfada7d7324e53c",
-        units: 190968096,
+        pubKeyHash: "f93af105187d21ed6adfa5d71bfada7d7324e53c",
+        satoshis: 190968096,
       },
     ],
   };
@@ -169,21 +171,21 @@ async function main() {
     ],
     outputs: [
       {
-        pubkeyhash: "5bcd0d776a7252310b9f1a7eee1a749d42126944",
-        //pubkeyhash: "1e0a6ef6085bb8af443a9e7f8941e61deb09fb54",
-        units: quarterValue,
+        pubKeyHash: "5bcd0d776a7252310b9f1a7eee1a749d42126944",
+        //pubKeyHash: "1e0a6ef6085bb8af443a9e7f8941e61deb09fb54",
+        satoshis: quarterValue,
       },
       {
-        pubkeyhash: "5bcd0d776a7252310b9f1a7eee1a749d42126944",
-        units: quarterValue,
+        pubKeyHash: "5bcd0d776a7252310b9f1a7eee1a749d42126944",
+        satoshis: quarterValue,
       },
       {
-        pubkeyhash: "5bcd0d776a7252310b9f1a7eee1a749d42126944",
-        units: quarterValue,
+        pubKeyHash: "5bcd0d776a7252310b9f1a7eee1a749d42126944",
+        satoshis: quarterValue,
       },
       {
-        pubkeyhash: "5bcd0d776a7252310b9f1a7eee1a749d42126944",
-        units: quarterValue,
+        pubKeyHash: "5bcd0d776a7252310b9f1a7eee1a749d42126944",
+        satoshis: quarterValue,
       },
     ],
   };
@@ -267,8 +269,8 @@ async function main() {
     ],
     outputs: [
       {
-        pubkeyhash: "f93af105187d21ed6adfa5d71bfada7d7324e53c",
-        units: 190968096,
+        pubKeyHash: "f93af105187d21ed6adfa5d71bfada7d7324e53c",
+        satoshis: 190968096,
       },
     ],
   });
