@@ -65,7 +65,7 @@ var DashTx = ("object" === typeof module && exports) || {};
 
   let TxUtils = {};
 
-  const VERSION = 3;
+  const CURRENT_VERSION = 3;
   const SATOSHIS = 100000000;
 
   const MAX_U8 = Math.pow(2, 8) - 1;
@@ -217,7 +217,7 @@ var DashTx = ("object" === typeof module && exports) || {};
   //@ts-ignore
   Tx.createLegacyTx = async function (coins, outputs, changeOutput) {
     // TODO bump to 4 for DIP: enforce tx hygiene
-    let version = 3;
+    let version = CURRENT_VERSION;
 
     coins = coins.slice(0);
     outputs = outputs.slice(0);
@@ -537,7 +537,7 @@ var DashTx = ("object" === typeof module && exports) || {};
       /** @type {Array<TxInputHashable|TxInputSigned>} */
       inputs: [],
       outputs: txInfo.outputs,
-      version: txInfo.version,
+      version: txInfo.version || CURRENT_VERSION,
       _DANGER_donate: txInfo._DANGER_donate,
       _donation_memo: txInfo._donation_memo,
     };
@@ -620,7 +620,7 @@ var DashTx = ("object" === typeof module && exports) || {};
       locktime: txInfo.locktime || 0x0,
       outputs: txInfo.outputs,
       transaction: transaction,
-      version: txInfo.version,
+      version: txInfo.version || CURRENT_VERSION,
     };
   };
 
@@ -685,7 +685,7 @@ var DashTx = ("object" === typeof module && exports) || {};
    * @param {Boolean} [opts._debug] - bespoke debug output
    */
   Tx._create = function ({
-    version = VERSION,
+    version = CURRENT_VERSION,
     inputs,
     locktime = 0x0,
     outputs,
