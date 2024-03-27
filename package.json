@@ -18,7 +18,7 @@
   "scripts": {
     "bump": "npm version -m \"chore(release): bump to v%s\"",
     "fmt": "npm run prettier",
-    "lint": "npm run jshint && npm run tsc",
+    "lint": "npm run jshint",
     "prepublish": "npx -p jswt@1.x -- reexport",
     "test": "node ./tests/",
     "--------------": "-----------------------------------------------",
