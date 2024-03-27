@@ -27,10 +27,13 @@
  * @prop {TxSum} sum - sums an array of TxInputUnspent
  * @prop {TxUtils} utils
  * @prop {Function} _create
+ * @prop {Function} _createInsufficientFundsError
  * @prop {Function} _createKeyUtils
+ * @prop {Function} _createMemoScript
  * @prop {Function} _hash
  * @prop {Function} _hashAndSignAll
- * @prop {Function} _createMemoScript
+ * @prop {Function} _legacyMustSelectInputs
+ * @prop {Function} _legacySelectOptimalUtxos
  */
 
 /**
@@ -226,6 +229,240 @@ var DashTx = ("object" === typeof module && exports) || {};
       }
 
       return await Tx._hashAndSignAll(txInfo, txInst._utils);
+    };
+
+    txInst.legacy = {};
+
+    /**
+     * @param {Object} opts
+     * @param {Array<CoreUtxo>?} [opts.inputs]
+     * @param {Array<CoreUtxo>?} [opts.utxos]
+     * @param {TxOutput} opts.output
+     * @returns {TxDraft}
+     */
+    txInst.legacy.draftSingleOutput = function ({ utxos, inputs, output }) {
+      let fullTransfer = false;
+
+      if (!inputs) {
+        inputs = DashTx._legacyMustSelectInputs({
+          utxos: utxos,
+          satoshis: output.satoshis,
+        });
+        if (!inputs) {
+          // tsc can't tell that 'inputs' was just guaranteed
+          throw new Error(`type checker workaround`);
+        }
+      } else {
+        fullTransfer = !output.satoshis;
+      }
+
+      let totalAvailable = DashTx.sum(inputs);
+      let fees = DashTx.appraise({ inputs: inputs, outputs: [output] });
+
+      //let EXTRA_SIG_BYTES_PER_INPUT = 2;
+      let CHANCE_INPUT_SIGS_HAVE_NO_EXTRA_BYTES = 1 / 4;
+      let MINIMUM_CHANCE_SIG_MATCHES_TARGET = 1 / 20;
+
+      let feeTarget = fees.min;
+      let chanceSignaturesMatchLowestFee = Math.pow(
+        CHANCE_INPUT_SIGS_HAVE_NO_EXTRA_BYTES,
+        inputs.length,
+      );
+      let minimumIsUnlikely =
+        chanceSignaturesMatchLowestFee < MINIMUM_CHANCE_SIG_MATCHES_TARGET;
+      if (minimumIsUnlikely) {
+        //let likelyPadByteSize = EXTRA_SIG_BYTES_PER_INPUT * inputs.length;
+        let likelyPadByteSize = inputs.length;
+        feeTarget += likelyPadByteSize;
+      }
+
+      let recip = Object.assign({}, output);
+      if (!recip.satoshis) {
+        recip.satoshis = totalAvailable + -feeTarget;
+      }
+      let outputs = [recip];
+
+      let change;
+      let changeSats =
+        totalAvailable + -recip.satoshis + -feeTarget + -DashTx.OUTPUT_SIZE;
+      let hasChange = changeSats > DashTx.LEGACY_DUST;
+      if (hasChange) {
+        change = { address: "", satoshis: changeSats };
+        outputs.push(change);
+        feeTarget += DashTx.OUTPUT_SIZE;
+      } else {
+        change = null;
+        // Re: Dash Direct: we round in favor of the network (exact payments)
+        feeTarget = totalAvailable + -recip.satoshis;
+      }
+
+      let txInfoRaw = {
+        inputs,
+        outputs,
+        change,
+        feeTarget,
+        fullTransfer,
+      };
+
+      return txInfoRaw;
+    };
+
+    /**
+     * @param {TxDraft} txDraft
+     * @param {Array<TxPrivateKey>} keys
+     * @returns {Promise<TxSummary>}
+     */
+    txInst.legacy.finalizePresorted = async function (txDraft, keys) {
+      /** @type {TxInfoSigned} */
+      let txSigned = await txInst.legacy
+        ._signToTarget(txDraft, keys)
+        .catch(async function (e) {
+          if ("E_NO_ENTROPY" !== e.code) {
+            throw e;
+          }
+
+          let _txSigned = await txInst.legacy._signFeeWalk(txDraft, keys);
+          return _txSigned;
+        });
+
+      let txSummary = txInst.legacy._summarizeTx(txSigned);
+      return txSummary;
+    };
+
+    /**
+     * @param {TxDraft} txDraft
+     * @param {Array<Uint8Array>} keys
+     * @returns {Promise<TxInfoSigned>}
+     */
+    txInst.legacy._signToTarget = async function (txDraft, keys) {
+      let limit = 128;
+      let lastTx = "";
+      let hasEntropy = true;
+
+      /** @type {TxInfoSigned} */
+      let txSigned;
+      let fee;
+
+      for (let n = 0; true; n += 1) {
+        txSigned = await txInst.hashAndSignAll(txDraft, keys);
+
+        fee = txSigned.transaction.length / 2;
+        if (fee <= txDraft.feeTarget) {
+          break;
+        }
+
+        if (txSigned.transaction === lastTx) {
+          hasEntropy = false;
+          break;
+        }
+        lastTx = txSigned.transaction;
+
+        if (n >= limit) {
+          let msg = `(near-)infinite loop: fee is ${fee} trying to hit target fee of ${txDraft.feeTarget}`;
+          throw new Error(msg);
+        }
+      }
+      if (!hasEntropy) {
+        let err = new Error(
+          "secp265k1 implementation does not use signature entropy",
+        );
+        Object.assign(err, { code: "E_NO_ENTROPY" });
+        throw err;
+      }
+
+      return txSigned;
+    };
+
+    /**
+     * Strategy for signing transactions when a non-entropy signing method is used -
+     * exhaustively walk each possible signature until one that works is found.
+     * @param {TxDraft} txDraft
+     * @param {Array<Uint8Array>} keys
+     * @returns {Promise<TxInfoSigned>}
+     */
+    txInst.legacy._signFeeWalk = async function (txDraft, keys) {
+      //@ts-ignore - TODO should have satoshis by now
+      let totalIn = DashTx.sum(txDraft.inputs);
+      let totalOut = DashTx.sum(txDraft.outputs);
+      let totalFee = totalIn - totalOut;
+
+      let fees = DashTx.appraise(txDraft);
+      let limit = fees.max - totalFee;
+
+      /** @type TxInfoSigned */
+      let txSigned;
+
+      for (let n = 0; true; n += 1) {
+        let changeSats = txDraft.change?.satoshis || 0;
+        let hasChange = changeSats > 0;
+        let canIncreaseFee = txDraft.fullTransfer || hasChange;
+        if (!canIncreaseFee) {
+          // TODO try to add another utxo before failing
+          throw new Error(
+            `no signing entropy and the fee variance is too low to cover the marginal cost of all possible signature iterations`,
+          );
+        }
+
+        let outIndex = 0;
+        if (hasChange) {
+          outIndex = txDraft.outputs.length - 1;
+        }
+        txDraft.outputs[outIndex].satoshis -= 1;
+        totalFee += 1;
+
+        txSigned = await txInst.hashAndSignAll(txDraft, keys);
+
+        let byteFee = txSigned.transaction.length / 2;
+        if (byteFee <= totalFee) {
+          break;
+        }
+
+        if (n >= limit) {
+          throw new Error(
+            `(near-)infinite loop: fee is ${byteFee} trying to hit target fee of ${txDraft.feeTarget}`,
+          );
+        }
+      }
+
+      return txSigned;
+    };
+
+    /**
+     * @param {TxInfoSigned} txInfo
+     * @returns {TxSummary}
+     */
+    txInst.legacy._summarizeTx = function (txInfo) {
+      //@ts-ignore - our inputs are mixed with CoreUtxo
+      let totalAvailable = Tx.sum(txInfo.inputs);
+
+      let recipient = txInfo.outputs[0];
+      // to satisfy tsc
+      if (!recipient.address) {
+        recipient.address = "";
+      }
+
+      let sent = recipient.satoshis;
+      let fee = totalAvailable - sent;
+
+      let changeSats = 0;
+      let change = txInfo.outputs[1];
+      if (change) {
+        changeSats = change.satoshis;
+      }
+      fee -= changeSats;
+
+      // 000 0.00 000 000
+      let summaryPartial = {
+        total: totalAvailable,
+        sent: sent,
+        fee: fee,
+        output: recipient,
+        recipient: recipient,
+        change: change,
+      };
+      let summary = Object.assign({}, txInfo, summaryPartial);
+
+      return summary;
     };
 
     return txInst;
@@ -514,6 +751,122 @@ var DashTx = ("object" === typeof module && exports) || {};
     }
 
     return Object.assign(_utils, myUtils);
+  };
+
+  /**
+   * @template {Pick<CoreUtxo, "satoshis">} T
+   * @param {Object} opts
+   * @param {Array<T>} opts.utxos
+   * @param {Uint53} [opts.satoshis]
+   * @param {Uint53} [opts.now] - ms
+   * @returns {Array<T>}
+   */
+  Tx._legacyMustSelectInputs = function ({ utxos, satoshis }) {
+    if (!satoshis) {
+      let msg = `expected target selection value 'satoshis' to be a positive integer but got '${satoshis}'`;
+      let err = new Error(msg);
+      throw err;
+    }
+
+    let selected = Tx._legacySelectOptimalUtxos(utxos, satoshis);
+    if (!selected.length) {
+      throw Tx._createInsufficientFundsError(utxos, satoshis);
+    }
+
+    return selected;
+  };
+
+  /**
+   * @template {Pick<CoreUtxo, "satoshis">} T
+   * @param {Array<T>} utxos
+   * @param {Uint53} outputSats
+   * @return {Array<T>}
+   */
+  Tx._legacySelectOptimalUtxos = function (utxos, outputSats) {
+    let numOutputs = 1;
+    let extraSize = 0;
+    let fees = DashTx._appraiseCounts(utxos.length, numOutputs, extraSize);
+
+    let fullSats = outputSats + fees.min;
+
+    let balance = Tx.sum(utxos);
+    if (balance < fullSats) {
+      /** @type Array<T> */
+      return [];
+    }
+
+    // from largest to smallest
+    utxos.sort(function (a, b) {
+      return b.satoshis - a.satoshis;
+    });
+
+    /** @type Array<T> */
+    let included = [];
+    let total = 0;
+
+    // try to get just one
+    utxos.every(function (utxo) {
+      if (utxo.satoshis > fullSats) {
+        included[0] = utxo;
+        total = utxo.satoshis;
+        return true;
+      }
+      return false;
+    });
+    if (total) {
+      return included;
+    }
+
+    // try to use as few coins as possible
+    let hasEnough = utxos.some(function (utxo, i) {
+      included.push(utxo);
+      total += utxo.satoshis;
+      if (total >= fullSats) {
+        return true;
+      }
+
+      // TODO we could optimize for minimum and retry on exception during finalize
+
+      // it quickly becomes astronomically unlikely to hit the one
+      // exact possibility that least to paying the absolute minimum,
+      // but remains about 75% likely to hit any of the mid value
+      // possibilities
+      if (i < 2) {
+        // 1 input 25% chance of minimum (needs ~2 tries)
+        // 2 inputs 6.25% chance of minimum (needs ~8 tries)
+        fullSats = fullSats + DashTx.MIN_INPUT_SIZE;
+        return false;
+      }
+      // but by 3 inputs... 1.56% chance of minimum (needs ~32 tries)
+      // by 10 inputs... 0.00953674316% chance (needs ~524288 tries)
+      fullSats = fullSats + DashTx.MIN_INPUT_SIZE + 1;
+    });
+    if (!hasEnough) {
+      /** @type Array<T> */
+      return [];
+    }
+
+    return included;
+  };
+
+  /**
+   * @param {Array<CoreUtxo>} allInputs
+   * @param {Uint53} satoshis
+   * @throws {Error}
+   */
+  Tx._createInsufficientFundsError = function (allInputs, satoshis) {
+    let totalBalance = Tx.sum(allInputs);
+    let dashBalance = Tx.toDash(totalBalance);
+    let dashAmount = Tx.toDash(satoshis);
+
+    let numOutputs = 1;
+    let extraSize = 0;
+    let fees = DashTx._appraiseCounts(allInputs.length, numOutputs, extraSize);
+    let feeAmount = Tx.toDash(fees.mid);
+
+    let msg = `insufficient funds: cannot pay ${dashAmount} (+${feeAmount} fee) with ${dashBalance}`;
+    let err = new Error(msg);
+    throw err;
   };
 
   /**
@@ -1282,6 +1635,15 @@ if ("object" === typeof module) {
 // Type Defs
 
 /**
+ * @typedef CoreUtxo
+ * @property {String} txId
+ * @property {Number} outputIndex
+ * @property {String} address
+ * @property {String} script
+ * @property {Number} satoshis
+ */
+
+/**
  * @typedef TxDeps
  * @prop {TxSign} sign
  * @prop {TxToPublicKey} [toPublicKey]
@@ -1306,6 +1668,14 @@ if ("object" === typeof module) {
  * @prop {Boolean} [_debug] - bespoke debug output
  */
 
+/** @typedef {TxInfo & TxDraftPartial} TxDraft */
+/**
+ * @typedef TxDraftPartial
+ * @prop {TxOutput?} change
+ * @prop {Uint53} feeTarget
+ * @prop {Boolean} fullTransfer
+ */
+
 /**
  * @typedef TxInfoSigned
  * @prop {Array<TxInputSigned>} inputs
@@ -1314,6 +1684,19 @@ if ("object" === typeof module) {
  * @prop {Uint32} version
  * @prop {String} transaction - signed transaction hex
  * @prop {Boolean} [_debug] - bespoke debug output
+ */
+
+/** @typedef {TxInfoSigned & TxSummaryPartial} TxSummary */
+/**
+ * @typedef TxSummaryPartial
+ * @prop {Uint53} total - sum of all inputs
+ * @prop {Uint53} sent - sum of all outputs
+ * @prop {Uint53} fee - actual fee
+ * @prop {Array<TxOutput>} outputs
+ * @prop {Array<TxInput>} inputs
+ * @prop {TxOutput} output - alias of 'recipient' for backwards-compat
+ * @prop {TxOutput} recipient - output to recipient
+ * @prop {TxOutput} change - sent back to self
  */
 
 /**
