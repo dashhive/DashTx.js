@@ -1254,6 +1254,9 @@ if ("object" === typeof module) {
 
 // Type Aliases
 
+/** @typedef {Number} Float64 */
+/** @typedef {Number} Uint53 */
+/** @typedef {Number} Uint32 */
 /** @typedef {Uint8Array} TxPrivateKey */
 /** @typedef {Uint8Array} TxPublicKey */
 /** @typedef {Uint8Array} TxSignature */
