@@ -211,7 +211,7 @@ async function main() {
       );
       let memo = script.slice(4, 2 * lockScriptSize);
       let decoder = new TextDecoder();
-      let bytes = hexToBytes(memo);
+      let bytes = Tx.utils.hexToBytes(memo);
       let msg = "";
       try {
         msg = decoder.decode(bytes);
@@ -272,21 +272,6 @@ async function main() {
   let txCost = txBytes + totalUnits;
   console.info(`Tx Min Cost:    ${txCost}`);
   console.info();
-}
-
-function hexToBytes(hex) {
-  let len = hex.length / 2;
-  let bytes = new Uint8Array(len);
-
-  let index = 0;
-  for (let i = 0; i < hex.length; i += 2) {
-    let c = hex.slice(i, i + 2);
-    let b = parseInt(c, 16);
-    bytes[index] = b;
-    index += 1;
-  }
-
-  return bytes;
 }
 
 main()
