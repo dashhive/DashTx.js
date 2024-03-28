@@ -8,6 +8,7 @@
  * @prop {Uint32} MAX_INPUT_PAD - 2 (possible ASN.1 BigInt padding)
  * @prop {Uint32} MAX_INPUT_SIZE - 149 each (with padding)
  * @prop {Uint32} OUTPUT_SIZE - 34 each
+ * @prop {Uint32} SIGHASH_ALL - 0x01
  * @prop {TxAppraise} appraise
  * @prop {TxAppraiseCounts} _appraiseCounts
  * @prop {TxAppraiseMemos} _appraiseMemos
@@ -136,6 +137,8 @@ var DashTx = ("object" === typeof module && exports) || {};
     8 + // satoshis (base units) value
     1 + // lockscript size
     25; // lockscript
+
+  Tx.SIGHASH_ALL = 0x01;
 
   Tx.appraise = function (txInfo) {
     let extraSize = Tx._appraiseMemos(txInfo.outputs);
@@ -879,8 +882,6 @@ var DashTx = ("object" === typeof module && exports) || {};
    * @returns {Promise<TxInfoSigned>}
    */
   Tx._hashAndSignAll = async function (txInfo, myUtils) {
-    let sigHashType = 0x01;
-
     let sortedInputs = txInfo.inputs.slice(0);
     sortedInputs.sort(Tx.sortInputs);
     for (let i = 0; i < sortedInputs.length; i += 1) {
@@ -944,7 +945,7 @@ var DashTx = ("object" === typeof module && exports) || {};
       let txInput = txInfo.inputs[i];
       // TODO script -> lockScript, sigScript
       //let lockScriptHex = txInput.script;
-      let _sigHashType = txInput.sigHashType ?? sigHashType;
+      let _sigHashType = txInput.sigHashType ?? Tx.SIGHASH_ALL;
       let txHashable = Tx.createHashable(txInfo, i);
       let txHashBuf = await Tx.hashPartial(txHashable, _sigHashType);
       let privKey = await myUtils.getPrivateKey(txInput, i, txInfo.inputs);
@@ -1335,7 +1336,7 @@ var DashTx = ("object" === typeof module && exports) || {};
     return id;
   };
 
-  Tx.hashPartial = async function (txHex, sigHashType = 0x01) {
+  Tx.hashPartial = async function (txHex, sigHashType = Tx.SIGHASH_ALL) {
     let txSignable = txHex;
     if (sigHashType) {
       let sigHashTypeHex = toUint32LE(sigHashType);
@@ -1867,7 +1868,7 @@ if ("object" === typeof module) {
 /**
  * @callback TxHashPartial
  * @param {String} txHex - signable tx hex (like raw tx, but with (lock)script)
- * @param {Uint32} sigHashType - typically 0x01 (SIGHASH_ALL) for signable
+ * @param {Uint32} [sigHashType] - typically 0x01 (SIGHASH_ALL) for signable
  * @returns {Promise<Uint8Array>}
  */
 

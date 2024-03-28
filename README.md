@@ -297,7 +297,7 @@ Tx.utils.strToHex(str);
 Tx.createRaw(txInfoMinimal);
 Tx.createHashable(txInfo, inputIndex);
 Tx.createSigned(txInfoSigned);
-Tx.hashPartial(txHex);
+Tx.hashPartial(txHex, Tx.SIGHASH_ALL);
 
 // Deprecated
 Tx.createLegacyTx(coins, outputs, changeOutput);
@@ -425,7 +425,7 @@ Tx.getId(txHex);
  * order because we use a standard ECSDA signing function that
  * expects bytes in the normal order.
  */
-Tx.hashPartial(txHex);
+Tx.hashPartial(txHex, Tx.SIGHASH_ALL);
 ```
 
 ### Utility Functions

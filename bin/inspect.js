@@ -11,6 +11,7 @@ let filepath = process.argv[2];
 const OP_RETURN = 0x6a; // 106
 
 async function main() {
+  /* jshint maxstatements: 200 */
   let hasInputScript = false;
   let totalUnits = 0;
 
@@ -249,8 +250,8 @@ async function main() {
     );
     console.info();
 
-    let txHash = await Tx.hashPartial(hex);
-    let txHashHex = Tx.utils.u8ToHex(txHash);
+    let txHash = await Tx.hashPartial(hex, Tx.SIGHASH_ALL);
+    let txHashHex = Tx.utils.bytesToHex(txHash);
     // TODO 'N/A' if not applicable
     console.info(`Tx Hash: ${txHashHex}`);
     console.info(`TxID:   N/A`);
