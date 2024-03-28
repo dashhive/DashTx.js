@@ -11,7 +11,7 @@ let DashTx = require("../");
 let DashKeys = require("dashkeys");
 let Secp256k1 = require("@dashincubator/secp256k1");
 
-/** @type {import('../').TxSign} */
+/** @type {import('../dashtx.js').TxSign} */
 async function signTx(privKeyBytes, hashBytes) {
   let sigOpts = { canonical: true };
   let sigBuf = await Secp256k1.sign(hashBytes, privKeyBytes, sigOpts);
