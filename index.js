@@ -9,13 +9,22 @@ module.exports = require("./dashtx.js");
  * @typedef {import('./dashtx.js').Tx} Tx
  * @typedef {import('./dashtx.js').TxUtils} TxUtils
  * @typedef {import('./dashtx.js').tx} tx
+ * @typedef {import('./dashtx.js').Float64} Float64
+ * @typedef {import('./dashtx.js').Uint53} Uint53
+ * @typedef {import('./dashtx.js').Uint32} Uint32
+ * @typedef {import('./dashtx.js').Uint8} Uint8
  * @typedef {import('./dashtx.js').TxPrivateKey} TxPrivateKey
  * @typedef {import('./dashtx.js').TxPublicKey} TxPublicKey
  * @typedef {import('./dashtx.js').TxSignature} TxSignature
+ * @typedef {import('./dashtx.js').CoreUtxo} CoreUtxo
  * @typedef {import('./dashtx.js').TxDeps} TxDeps
  * @typedef {import('./dashtx.js').TxFees} TxFees
  * @typedef {import('./dashtx.js').TxInfo} TxInfo
+ * @typedef {import('./dashtx.js').TxDraft} TxDraft
+ * @typedef {import('./dashtx.js').TxDraftPartial} TxDraftPartial
  * @typedef {import('./dashtx.js').TxInfoSigned} TxInfoSigned
+ * @typedef {import('./dashtx.js').TxSummary} TxSummary
+ * @typedef {import('./dashtx.js').TxSummaryPartial} TxSummaryPartial
  * @typedef {import('./dashtx.js').TxInput} TxInput
  * @typedef {import('./dashtx.js').TxInputHashable} TxInputHashable
  * @typedef {import('./dashtx.js').TxInputRaw} TxInputRaw

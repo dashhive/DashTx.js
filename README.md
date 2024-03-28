@@ -262,15 +262,52 @@ above, there were 2 inputs and 2 outputs. The example is truncated for brevity.
 # API
 
 <!--
-rg '^\s+Tx\.'
+rg '^\s+Tx\.[A-Z_]+ ='
 -->
 
-```txt
-Tx.HEADER_SIZE         //  10
-Tx.MIN_INPUT_SIZE      // 147
-Tx.MAX_INPUT_SIZE      // 150
-Tx.MAX_INPUT_PAD       //   3
-Tx.OUTPUT_SIZE         //  34
+```text
+Tx.SATOSHIS            // 1_000_00000
+Tx.LEGACY_DUST         //       02000
+
+Tx.HEADER_SIZE         //          10
+Tx.MIN_INPUT_SIZE      //         147
+Tx.MAX_INPUT_SIZE      //         149
+Tx.MAX_INPUT_PAD       //           2
+Tx.OUTPUT_SIZE         //          34
+```
+
+```text
+Tx.create({ sign, getPrivateKey });
+    tx.hashAndSignAll(txInfo);
+    tx.legacy.draftSingleOutput({ utxos, inputs, output });
+    tx.legacy.finalizePresorted(txDraft, keys);
+
+Tx.appraise({ inputs, outputs });
+Tx.getId(txHex);
+
+// Byte-level helpers
+Tx.utils.toVarInt(n);
+Tx.utils.toVarIntSize(n);
+Tx.utils.reverseHex(hex);
+Tx.utils.bytesToHex(bytes);
+Tx.utils.hexToBytes(hex);
+Tx.utils.strToHex(str);
+
+// Low-level helpers
+Tx.createRaw(txInfoMinimal);
+Tx.createHashable(txInfo, inputIndex);
+Tx.createSigned(txInfoSigned);
+Tx.hashPartial(txHex);
+
+// Deprecated
+Tx.createLegacyTx(coins, outputs, changeOutput);
+Tx.utils.hexToU8 // Tx.utils.hexToBytes;
+Tx.utils.u8ToHex // Tx.utils.bytesToHex;
+
+// Not API-locked, May change
+Tx.utils.sign(privateKey, txHashBytes);
+Tx.utils.toPublicKey(privKeyBytes);
+Tx.utils.addrToPubKeyHash(addr);
 ```
 
 ```js
@@ -280,7 +317,7 @@ Tx.OUTPUT_SIZE         //  34
 Tx.create({ sign, getPrivateKey });
 
 /**
- * Estimates the min, mid, and max sizes of (fees for) a transaction.
+ * Estimates the min, mid, and max sizes of (fees for) a transaction (including memos).
  * (if in doubt, start with the mid - its's 75% likely to match the signed size)
  * (non-deterministic because signed size is based on the variable-size signature)
  */
@@ -288,6 +325,8 @@ Tx.appraise({ inputs, outputs });
 // { min: 191, mid: 192, max: 193 }
 
 /**
+ * Deprecated. Use `dashTx.legacy.draftSingleOutput()` instead.
+ *
  * Magic. The old kind.
  *
  * Calculates totals, fees and output change, AND selects
@@ -300,15 +339,52 @@ Tx.createLegacyTx(coins, outputs, changeOutput);
 // { version, inputs, outputs, changeIndex, locktime}
 // let change = txInfo.outputs[txInfo.changeIndex];
 
-/**
- * Creates the variety of required hashable transactions
- * (one per each input), signs them, and then constructs
- * a broadcastable transaction.
- *
- * Note: your inputs and outputs will be sorted according to
- * "Lexicographical Indexing of Transaction Inputs and Outputs"
- */
-tx.hashAndSignAll(txInfo);
+{
+  /**
+   * Creates the variety of required hashable transactions
+   * (one per each input), signs them, and then constructs
+   * a broadcastable transaction.
+   *
+   * Note: your inputs and outputs should be sorted according to
+   * "Lexicographical Indexing of Transaction Inputs and Outputs":
+   *
+   *     txInfo.inputs.sort(Tx.sortInputs)
+   *     txInfo.outputs.sort(Tx.sortOutputs)
+   */
+  tx.hashAndSignAll(txInfo);
+
+  /**
+   * Drafts a multiple-input, single-output transaction.
+   * (each `input.address` and the `output.address` may be set before or after)
+   *
+   * Sending Modes:
+   *   - "Automatic Coin Selection":    use `utxos`, NOT `inputs`
+   *   - "Coin Control"            :    use `inputs`, NOT `utxos`
+   *   - "Full Balance Transfer"   :    use `inputs`, NOT `utxos` and
+   *                                    set `output.satoshis = null`
+   *
+   *  Change:
+   *   - `txDraft.change` is a reference to the relevant `txDraft.outputs[i]`
+   *   - `txDraft.change.address` MUST be set before signing the transaction
+   *
+   *  BIP-69 Secure Sorting must be done AFTER setting each `address`
+   *   - `Tx.sortInputs(txDraft.inputs)`
+   *   - `Tx.sortOutputs(txDraft.outputs)`
+   */
+  let txDraft = tx.legacy.draftSingleOutput({ utxos, inputs, output });
+
+  /**
+   * Signs the draft with variations to find a signature whose fee will
+   * closely match `txDraft.feeTarget`.
+   *
+   *   - `inputs` and `outputs` MUST be sorted BEFORE calling this
+   *   - `txDraft.feeTarget` should be at least 10% likely
+   *     - the likelihood of `fees.min` is   `1 / Math.pow(4, inputs.length)`
+   *     - the likelihood of `fees.mid` is  75%
+   *     - the likelihood of `fees.max` is 100%
+   */
+  let txSummary = tx.legacy.finalizePresorted(txDraft, keys);
+}
 
 /**
  * Creates an "null" transaction with minimal information.
