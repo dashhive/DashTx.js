@@ -2,14 +2,21 @@
   "name": "dashtx",
   "version": "0.14.4",
   "description": "Create DASH Transactions with Vanilla JS (0 deps, cross-platform)",
-  "main": "index.js",
+  "main": "dashtx.js",
+  "module": "dashtx.mjs",
+  "type": "commonjs",
+  "exports": {
+    ".": {
+      "require": "./dashtx.js",
+      "import": "./dashtx.mjs",
+      "default": "./dashtx.js"
+    }
+  },
   "files": [
-    "index.js",
     "dashtx.js",
-    "./lib/"
+    "dashtx.mjs"
   ],
   "browser": {
-    "index.js": "dashtx.js",
     "crypto": false
   },
   "bin": {
