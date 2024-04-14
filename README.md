@@ -37,10 +37,10 @@ let tx = Tx.create({ sign: sign });
 
 let Secp256k1 = require("@dashincubator/secp256k1");
 
-async function sign({ privateKey, hash }) {
+async function sign(privKeyBytes, hashBytes) {
   let sigOpts = { canonical: true, extraEntropy: true };
-  let sigBytes = await Secp256k1.sign(hash, privateKey, sigOpts);
-  return Tx.utils.bytesToHex(sigBytes);
+  let sigBytes = await Secp256k1.sign(hashBytes, privKeyBytes, sigOpts);
+  return sigBytes;
 }
 
 // ...
@@ -64,10 +64,10 @@ Note: You must provide your own `sign()` function, as shown below.
 
   let Secp256k1 = window.nobleSecp256k1;
 
-  async function sign({ privateKey, hash }) {
+  async function sign(privKeyBytes, hashBytes) {
     let sigOpts = { canonical: true, extraEntropy: true };
-    let sigBytes = await Secp256k1.sign(hash, privateKey, sigOpts);
-    return Tx.utils.bytesToHex(sigBytes);
+    let sigBytes = await Secp256k1.sign(hashBytes, privKeyBytes, sigOpts);
+    return sigBytes;
   }
 
   // ...
@@ -305,7 +305,7 @@ Tx.utils.hexToU8 // Tx.utils.hexToBytes;
 Tx.utils.u8ToHex // Tx.utils.bytesToHex;
 
 // Not API-locked, May change
-Tx.utils.sign(privateKey, txHashBytes);
+Tx.utils.sign(privKeyBytes, txHashBytes);
 Tx.utils.toPublicKey(privKeyBytes);
 Tx.utils.addrToPubKeyHash(addr);
 ```
