@@ -954,10 +954,12 @@ var DashTx = ("object" === typeof module && exports) || {};
       let privKey = await keyUtils.getPrivateKey(txInput, i, txInfo.inputs);
 
       let sigBuf = await keyUtils.sign(privKey, txHashBuf);
-      let sigHex = Tx.utils.bytesToHex(sigBuf);
+      let sigHex = "";
       if ("string" === typeof sigBuf) {
         console.warn(`sign() should return a Uint8Array of an ASN.1 signature`);
         sigHex = sigBuf;
+      } else {
+        sigHex = Tx.utils.bytesToHex(sigBuf);
       }
 
       let pubKeyHex = txInput.publicKey;
