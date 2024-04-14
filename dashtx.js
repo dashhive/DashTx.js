@@ -101,6 +101,19 @@ var DashTx = ("object" === typeof module && exports) || {};
   const PKH_SIZE = (20).toString(16); // 0x14
   const PKH_SCRIPT_SIZE = (25).toString(16); // 0x19
 
+  //@ts-ignore - for debug only
+  Tx._OP_DUP_HEX = OP_DUP;
+  //@ts-ignore - for debug only
+  Tx._OP_HASH160_HEX = OP_HASH160;
+  //@ts-ignore - for debug only
+  Tx._OP_EQUALVERIFY_HEX = OP_EQUALVERIFY;
+  //@ts-ignore - for debug only
+  Tx._OP_CHECKSIG_HEX = OP_CHECKSIG;
+  //@ts-ignore - for debug only
+  Tx._PKH_SIZE_HEX = PKH_SIZE;
+  //@ts-ignore - for debug only
+  Tx._PKH_SCRIPT_SIZE_HEX = PKH_SCRIPT_SIZE;
+
   const E_LITTLE_INT =
     "JavaScript 'Number's only go up to uint53, you must use 'BigInt' (ex: `let amount = 18014398509481984n`) for larger values";
   const E_TOO_BIG_INT =
