@@ -1014,7 +1014,9 @@ var DashTx = ("object" === typeof module && exports) || {};
     opts = Object.assign({}, opts);
     opts.inputs = opts.inputs.map(function (input) {
       return {
-        txId: input.txId,
+        //@ts-ignore - workaround for txId (insight) vs txid (dashcore rpc utxo) issue
+        // (picking 'txId' over 'txid' may have been a mistake in a recent update)
+        txId: input.txId || input.txid,
         outputIndex: input.outputIndex,
       };
     });
