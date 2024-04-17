@@ -1105,7 +1105,7 @@ var DashTx = ("object" === typeof module && exports) || {};
 
     /** @type Array<String> */
     let tx = [];
-    let v = toUint32LE(version);
+    let v = TxUtils._toUint32LE(version);
     tx.push(v);
     // txMap.version = v;
 
@@ -1140,7 +1140,7 @@ var DashTx = ("object" === typeof module && exports) || {};
           "expected utxo property 'outputIndex' to be an integer representing this input's previous output index",
         );
       }
-      let reverseVout = toUint32LE(voutIndex);
+      let reverseVout = TxUtils._toUint32LE(voutIndex);
       inputHex.push(reverseVout);
 
       //@ts-ignore - enum types not handled properly here
@@ -1260,7 +1260,7 @@ var DashTx = ("object" === typeof module && exports) || {};
       tx.push(txOut);
     }
 
-    let locktimeHex = toUint32LE(locktime);
+    let locktimeHex = TxUtils._toUint32LE(locktime);
     tx.push(locktimeHex);
     // txMap.locktime = locktimeHex;
 
@@ -1359,7 +1359,7 @@ var DashTx = ("object" === typeof module && exports) || {};
   Tx.hashPartial = async function (txHex, sigHashType = Tx.SIGHASH_ALL) {
     let txSignable = txHex;
     if (sigHashType) {
-      let sigHashTypeHex = toUint32LE(sigHashType);
+      let sigHashTypeHex = TxUtils._toUint32LE(sigHashType);
       txSignable = `${txSignable}${sigHashTypeHex}`;
     }
     //console.log("Signable Tx Hex");
@@ -1508,12 +1508,12 @@ var DashTx = ("object" === typeof module && exports) || {};
 
     //@ts-ignore
     if (n <= MAX_U16) {
-      return "fd" + toUint32LE(n).slice(0, 4);
+      return "fd" + TxUtils._toUint32LE(n).slice(0, 4);
     }
 
     //@ts-ignore
     if (n <= MAX_U32) {
-      return "fe" + toUint32LE(n);
+      return "fe" + TxUtils._toUint32LE(n);
     }
 
     //@ts-ignore
@@ -1541,7 +1541,7 @@ var DashTx = ("object" === typeof module && exports) || {};
    * which is true in practice, and much simpler.
    * @param {BigInt|Number} n - 32-bit positive int to encode
    */
-  function toUint32LE(n) {
+  TxUtils._toUint32LE = function (n) {
     // make sure n is uint32/int53, not int32
     //n = n >>> 0;
 
@@ -1550,7 +1550,7 @@ var DashTx = ("object" === typeof module && exports) || {};
 
     let hexLE = Tx.utils.reverseHex(hex);
     return hexLE;
-  }
+  };
 
   /**
    * This can handle Big-Endian CPUs, which don't exist,
