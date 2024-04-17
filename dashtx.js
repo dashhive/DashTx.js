@@ -15,6 +15,7 @@
  * @prop {TxToDash} toDash
  * @prop {TxToSats} toSats
  * @prop {TxCreate} create
+ * @prop {TxCreateDonationOutput} createDonationOutput
  * @prop {TxCreateRaw} createRaw
  * @prop {TxCreateHashable} createHashable
  * @prop {TxCreateSigned} createSigned
@@ -35,6 +36,8 @@
  * @prop {Function} _hashAndSignAll
  * @prop {Function} _legacyMustSelectInputs
  * @prop {Function} _legacySelectOptimalUtxos
+ * @prop {Function} _packInputs
+ * @prop {Function} _packOutputs
  */
 
 /**
@@ -118,6 +121,7 @@ var DashTx = ("object" === typeof module && exports) || {};
     "JavaScript 'Number's only go up to uint53, you must use 'BigInt' (ex: `let amount = 18014398509481984n`) for larger values";
   const E_TOO_BIG_INT =
     "JavaScript 'BigInt's are arbitrarily large, but you may only use up to UINT64 for transactions";
+  const E_NO_OUTPUTS = `'outputs' list must not be empty - use the developer debug option '_DANGER_donate: true' to bypass`;
 
   Tx.SATOSHIS = SATOSHIS;
   Tx.LEGACY_DUST = 2000;
@@ -190,6 +194,11 @@ var DashTx = ("object" === typeof module && exports) || {};
     let size = 0;
 
     for (let output of outputs) {
+      if (output.message) {
+        if (!output.memo) {
+          output.memo = TxUtils.strToHex(output.message);
+        }
+      }
       if (output.memo) {
         let memoSize = output.memo.length / 2;
         if (memoSize > MAX_U8) {
@@ -1096,27 +1105,45 @@ var DashTx = ("object" === typeof module && exports) || {};
     //@ts-ignore
     _donation_memo,
   }) {
-    let sep = "";
+    let _sep = "";
     if (_debug) {
-      sep = "\n";
+      _sep = "\n";
     }
-
-    // let txMap = {};
 
     /** @type Array<String> */
     let tx = [];
     let v = TxUtils._toUint32LE(version);
     tx.push(v);
-    // txMap.version = v;
 
+    void Tx._packInputs({ tx, inputs, _sep });
+
+    if (_DANGER_donate === true) {
+      let output = Tx.createDonationOutput({ memo: _donation_memo });
+      outputs.push(output);
+    }
+    void Tx._packOutputs({ tx, outputs, _sep });
+
+    let locktimeHex = TxUtils._toUint32LE(locktime);
+    tx.push(locktimeHex);
+
+    let txHex = tx.join(_sep);
+    return txHex;
+  };
+
+  /**
+   * Privately exported for use by DashJoin.js
+   * @param {Object} opts
+   * @param {Array<String>} opts.tx
+   * @param {Array<TxInputRaw|TxInputHashable|TxInputSigned>} opts.inputs
+   * @param {String} [opts._sep] - string to join hex segements ('' or '\n')
+   * @returns {Array<String>} - tx (original is modified if provided)
+   */
+  Tx._packInputs = function ({ tx = [], inputs, _sep = "" }) {
     let nInputs = Tx.utils.toVarInt(inputs.length);
     tx.push(nInputs);
-    // txMap.input_count = nInputs;
-    // txMap.inputs = [];
 
     for (let input of inputs) {
       let inputHex = [];
-      // txMap.inputs.push(inputHex);
 
       let txId = input.txId;
       if (!txId) {
@@ -1178,41 +1205,37 @@ var DashTx = ("object" === typeof module && exports) || {};
       let sequence = "ffffffff";
       inputHex.push(sequence);
 
-      let txIn = inputHex.join(sep);
+      let txIn = inputHex.join(_sep);
       tx.push(txIn);
     }
 
+    return tx;
+  };
+
+  /**
+   * Privately exported for use by DashJoin.js
+   * @param {Object} opts
+   * @param {Array<String>} opts.tx
+   * @param {Array<TxOutput>} opts.outputs
+   * @param {String} [opts._sep] - string to join hex segements ('' or '\n')
+   * @returns {Array<String>} - tx (original is modified if provided)
+   */
+  Tx._packOutputs = function ({ tx = [], outputs, _sep = "" }) {
     if (!outputs.length) {
-      if (!_DANGER_donate) {
-        throw new Error(
-          `'outputs' list must not be empty - use the developer debug option '_DANGER_donate: true' to bypass`,
-        );
-      }
-
-      let memo = _donation_memo;
-      if (!memo) {
-        let encoder = new TextEncoder();
-        let gifts = ["💸", "🎁", "🧧"];
-        let indexIsh = Math.random() * 3;
-        let index = Math.floor(indexIsh);
-        let gift = encoder.encode(gifts[index]);
-        memo = TxUtils.bytesToHex(gift);
-      }
-
-      outputs.push({
-        satoshis: 0,
-        memo: memo,
-      });
+      throw new Error(E_NO_OUTPUTS);
     }
 
     let nOutputs = Tx.utils.toVarInt(outputs.length);
     tx.push(nOutputs);
-    // txMap.output_count = nOutputs;
-    // txMap.outputs = [];
 
     for (let i = 0; i < outputs.length; i += 1) {
       let output = outputs[i];
 
+      if (output.message) {
+        if (!output.memo) {
+          output.memo = TxUtils.strToHex(output.message);
+        }
+      }
       if (output.memo) {
         let invalid = output.satoshis || output.address || output.pubKeyHash;
         if (invalid) {
@@ -1222,16 +1245,14 @@ var DashTx = ("object" === typeof module && exports) || {};
         }
 
         let outputHex = Tx._createMemoScript(output.memo, i);
-        // txMap.outputs.push(outputHex);
 
-        let txOut = outputHex.join(sep);
+        let txOut = outputHex.join(_sep);
         tx.push(txOut);
         continue;
       }
 
       /** @type {Array<String>} */
       let outputHex = [];
-      // txMap.outputs.push(outputHex);
 
       if (!output.satoshis) {
         throw new Error(`every output must have 'satoshis'`);
@@ -1256,18 +1277,25 @@ var DashTx = ("object" === typeof module && exports) || {};
       outputHex.push(output.pubKeyHash);
       outputHex.push(`${OP_EQUALVERIFY}${OP_CHECKSIG}`);
 
-      let txOut = outputHex.join(sep);
+      let txOut = outputHex.join(_sep);
       tx.push(txOut);
     }
 
-    let locktimeHex = TxUtils._toUint32LE(locktime);
-    tx.push(locktimeHex);
-    // txMap.locktime = locktimeHex;
+    return tx;
+  };
 
-    // console.log("DEBUG txMap", txMap);
+  Tx.createDonationOutput = function (opts) {
+    let satoshis = 0;
+    let message = opts?.message;
+    if (!message) {
+      let gifts = ["💸", "🎁", "🧧"];
+      let indexIsh = Math.random() * 3;
+      let index = Math.floor(indexIsh);
+      message = gifts[index];
+    }
 
-    let txHex = tx.join(sep);
-    return txHex;
+    let output = { satoshis, message };
+    return output;
   };
 
   /**
@@ -1779,6 +1807,7 @@ if ("object" === typeof module) {
 /**
  * @typedef TxOutput
  * @prop {String} [memo] - hex bytes of a memo (incompatible with pubKeyHash / address)
+ * @prop {String} [message] - memo, but as a UTF-8 string
  * @prop {String} [address] - payAddr as Base58Check (human-friendly)
  * @prop {String} [pubKeyHash] - payAddr's raw hex value (decoded, not Base58Check)
  * @prop {Uint53} satoshis - the number of smallest units of the currency
@@ -1829,6 +1858,13 @@ if ("object" === typeof module) {
  * @callback TxAppraiseMemos
  * @param {Array<TxOutput>} outputs
  * @returns {Uint32}
+ */
+
+/**
+ * Create a donation output with a nice message.
+ * @callback TxCreateDonationOutput
+ * @param {Object} [opts]
+ * @param {String} [opts.message] - UTF-8 Memo String
  */
 
 /**
@@ -1986,5 +2022,5 @@ if ("object" === typeof module) {
 /**
  * @callback TxStringToHex
  * @param {String} utf8
- * @returns {String}
+ * @returns {String} - encoded bytes as hex
  */

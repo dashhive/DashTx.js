@@ -282,6 +282,8 @@ Tx.create({ sign, getPrivateKey });
     tx.legacy.draftSingleOutput({ utxos, inputs, output });
     tx.legacy.finalizePresorted(txDraft, keys);
 
+Tx.createDonationOutput();
+
 Tx.appraise({ inputs, outputs });
 Tx.getId(txHex);
 
