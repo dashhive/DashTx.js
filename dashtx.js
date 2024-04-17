@@ -1236,7 +1236,7 @@ var DashTx = ("object" === typeof module && exports) || {};
       if (!output.satoshis) {
         throw new Error(`every output must have 'satoshis'`);
       }
-      let satoshis = toUint64LE(output.satoshis);
+      let satoshis = TxUtils._toUint64LE(output.satoshis);
       outputHex.push(satoshis);
 
       if (!output.pubKeyHash) {
@@ -1276,7 +1276,7 @@ var DashTx = ("object" === typeof module && exports) || {};
    */
   Tx._createMemoScript = function (memoHex, i = 0) {
     let outputHex = [];
-    let satoshis = toUint64LE(0);
+    let satoshis = TxUtils._toUint64LE(0);
     outputHex.push(satoshis);
 
     assertHex(memoHex, `output[${i}].memo`);
@@ -1518,7 +1518,7 @@ var DashTx = ("object" === typeof module && exports) || {};
 
     //@ts-ignore
     if (n <= MAX_U53) {
-      return "ff" + toUint64LE(n);
+      return "ff" + TxUtils._toUint64LE(n);
     }
 
     if ("bigint" !== typeof n) {
@@ -1528,7 +1528,7 @@ var DashTx = ("object" === typeof module && exports) || {};
     }
 
     if (n <= MAX_U64) {
-      return "ff" + toUint64LE(n);
+      return "ff" + TxUtils._toUint64LE(n);
     }
 
     let err = new Error(E_TOO_BIG_INT);
@@ -1558,7 +1558,7 @@ var DashTx = ("object" === typeof module && exports) || {};
    * @param {BigInt|Number} n - 64-bit BigInt or <= 53-bit Number to encode
    * @returns {String} - 8 Little-Endian bytes
    */
-  function toUint64LE(n) {
+  TxUtils._toUint64LE = function (n) {
     let bn;
     if ("bigint" === typeof n) {
       bn = n;
@@ -1582,7 +1582,7 @@ var DashTx = ("object" === typeof module && exports) || {};
     let hex = hexArr.join("");
 
     return hex;
-  }
+  };
 
   /** @type TxToVarIntSize */
   TxUtils.toVarIntSize = function (n) {
