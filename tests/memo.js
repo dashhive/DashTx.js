@@ -114,20 +114,13 @@ Zora.test("can create donation tx via memo", async function (t) {
     { pubKeyHash: pkh, satoshis: 20000, txId: txId, outputIndex: 0 },
   ];
 
-  /** @type {Array<DashTx.TxOutput>} */
-  let outputs = [];
-
-  let encoder = new TextEncoder();
-  //let memoBytes = encoder.encode("💸");
-  //let memoBytes = encoder.encode("🎁");
-  let memoBytes = encoder.encode("🧧");
-  let memo = DashTx.utils.bytesToHex(memoBytes);
+  //let donationOutput = Tx.createDonationOutput();
+  let memoOutput = { satoshis: 0, message: "🧧" };
+  let outputs = [memoOutput];
 
   let txInfo = {
     inputs: inputs,
     outputs: outputs,
-    _DANGER_donate: true,
-    _donation_memo: memo,
   };
 
   let privKey = DashTx.utils.hexToBytes(privKeyHex);

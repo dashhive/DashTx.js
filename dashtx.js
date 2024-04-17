@@ -121,7 +121,7 @@ var DashTx = ("object" === typeof module && exports) || {};
     "JavaScript 'Number's only go up to uint53, you must use 'BigInt' (ex: `let amount = 18014398509481984n`) for larger values";
   const E_TOO_BIG_INT =
     "JavaScript 'BigInt's are arbitrarily large, but you may only use up to UINT64 for transactions";
-  const E_NO_OUTPUTS = `'outputs' list must not be empty - use the developer debug option '_DANGER_donate: true' to bypass`;
+  const E_NO_OUTPUTS = `'outputs' list must not be empty; use .createDonationOutput({ message }) to burn inputs`;
 
   Tx.SATOSHIS = SATOSHIS;
   Tx.LEGACY_DUST = 2000;
@@ -937,10 +937,6 @@ var DashTx = ("object" === typeof module && exports) || {};
       inputs: [],
       outputs: txInfo.outputs,
       version: txInfo.version || CURRENT_VERSION,
-      //@ts-ignore - debug only
-      _DANGER_donate: txInfo._DANGER_donate,
-      //@ts-ignore
-      _donation_memo: txInfo._donation_memo,
     };
 
     // temp shim
@@ -1100,10 +1096,6 @@ var DashTx = ("object" === typeof module && exports) || {};
     outputs,
     /* maxFee = 10000, */
     _debug = false,
-    //@ts-ignore - debug only
-    _DANGER_donate = false,
-    //@ts-ignore
-    _donation_memo,
   }) {
     let _sep = "";
     if (_debug) {
@@ -1116,11 +1108,6 @@ var DashTx = ("object" === typeof module && exports) || {};
     tx.push(v);
 
     void Tx._packInputs({ tx, inputs, _sep });
-
-    if (_DANGER_donate === true) {
-      let output = Tx.createDonationOutput({ memo: _donation_memo });
-      outputs.push(output);
-    }
     void Tx._packOutputs({ tx, outputs, _sep });
 
     let locktimeHex = TxUtils._toUint32LE(locktime);
