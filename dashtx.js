@@ -28,9 +28,9 @@
  * @prop {TxSortOutputs} sortOutputs
  * @prop {TxSum} sum - sums an array of TxInputUnspent
  * @prop {TxUtils} utils
+ * @prop {Function} _addPrivKeyUtils
  * @prop {Function} _create
  * @prop {Function} _createInsufficientFundsError
- * @prop {Function} _createKeyUtils
  * @prop {Function} _createMemoScript
  * @prop {Function} _hash
  * @prop {Function} _hashAndSignAll
@@ -42,9 +42,6 @@
 
 /**
  * @typedef TxUtils
- * @prop {TxAddrToPubKeyHash} addrToPubKeyHash
- * @prop {TxSign} sign
- * @prop {TxToPublicKey} toPublicKey
  * @prop {TxToVarInt} toVarInt
  * @prop {TxToVarIntSize} toVarIntSize
  * @prop {TxReverseHex} reverseHex
@@ -230,33 +227,22 @@ var DashTx = ("object" === typeof module && exports) || {};
     return sats;
   };
 
-  Tx.create = function (_keyUtils) {
+  Tx.create = function (keyUtils) {
     let txInst = {};
-
-    txInst._utils = Object.assign({}, Tx.utils, _keyUtils);
 
     /** @type {TxHashAndSignAll} */
     txInst.hashAndSignAll = async function (txInfo, keys) {
-      // { getPublicKey, getPrivateKey, sign, toPublicKey }
-      let keyUtils = Object.assign({}, txInst._utils);
-
+      let privUtils = keyUtils;
       if (keys) {
-        //@ts-ignore
-        if (keys.getPrivateKey) {
-          //@ts-ignore
-          keyUtils.getPrivateKey = keys.getPrivateKey;
+        if (keys.length !== txInfo.inputs.length) {
+          let msg = `the number and order of 'keys' must match number of 'inputs' - each 'utxo' of the provided private key must be matched to that private key`;
+          throw new Error(msg);
         }
-        //@ts-ignore
-        else if (keys.length !== txInfo.inputs.length) {
-          throw new Error(
-            `the number and order of 'keys' must match number of 'inputs' - each 'utxo' of the provided private key must be matched to that private key`,
-          );
-        } else {
-          keyUtils = Tx._createKeyUtils(keyUtils, keys);
-        }
+        privUtils = Object.assign({}, keyUtils);
       }
+      void Tx._addPrivKeyUtils(privUtils, keys);
 
-      return await Tx._hashAndSignAll(txInfo, keyUtils);
+      return await Tx._hashAndSignAll(txInfo, privUtils);
     };
 
     txInst.legacy = {};
@@ -748,39 +734,42 @@ var DashTx = ("object" === typeof module && exports) || {};
   };
 
   /**
-   * @param {TxDeps} keyUtils
+   * @param {TxDeps} privUtils
    * @param {Array<TxPrivateKey>} keys
    */
-  Tx._createKeyUtils = function (keyUtils, keys) {
-    let _getPublicKey = keyUtils.getPublicKey || getPublicKey;
-    let _utils = {
+  Tx._addPrivKeyUtils = function (privUtils, keys) {
+    if (!privUtils.getPrivateKey) {
+      if (!keys) {
+        throw new Error(`you must create with 'getPrivateKey()'`);
+      }
       /** @type {TxGetPrivateKey} */
-      getPrivateKey: async function (_, i) {
+      privUtils.getPrivateKey = async function (_, i) {
+        //@ts-ignore - keys *is* defined, see above
         let privKey = keys[i];
         return privKey;
-      },
-      /** @type {TxGetPublicKey} */
-      getPublicKey: _getPublicKey,
-      sign: keyUtils.sign,
-    };
-
-    /** @type {TxGetPublicKey} */
-    async function getPublicKey(txInput, i, txInputs) {
-      let privKey = keys[i];
-      if (!keyUtils.toPublicKey) {
-        throw new Error("type assert: missing 'toPublicKey'");
-      }
-      let pubKey = keyUtils.toPublicKey(privKey);
-      if ("string" === typeof pubKey) {
-        console.warn(
-          "oops, you gave a publicKey as hex (deprecated) rather than a buffer",
-        );
-        pubKey = Tx.utils.hexToBytes(pubKey);
-      }
-      return pubKey;
+      };
     }
 
-    return Object.assign(_utils, keyUtils);
+    if (!privUtils.getPublicKey) {
+      const errGetPubKey =
+        "you must provide 'getPublicKey()' (efficient) or 'toPublicKey()' (to convert private key)";
+      if (!privUtils.toPublicKey) {
+        throw new Error(errGetPubKey);
+      }
+
+      /** @type {TxGetPublicKey} */
+      privUtils.getPublicKey = async function (txInput, i, txInputs) {
+        let privKeyBytes = await privUtils.getPrivateKey(txInput, i, txInputs);
+        //@ts-ignore - toPublicKey *is* defined above
+        let pubKeyBytes = await privUtils.toPublicKey(privKeyBytes);
+        if ("string" === typeof pubKeyBytes) {
+          throw new Error("toPublicKey() must return bytes (Uint8Array)");
+        }
+        return pubKeyBytes;
+      };
+    }
+
+    return privUtils;
   };
 
   /**
@@ -943,27 +932,23 @@ var DashTx = ("object" === typeof module && exports) || {};
       transaction: "",
     };
 
-    // temp shim
-    if (!keyUtils.getPrivateKey) {
-      throw new Error(`you must provide 'keys' or 'getPrivateKey()'`);
+    /**
+     * @param {TxPrivateKey} privKey
+     */
+    function createGetPrivateKey(privKey) {
+      return function () {
+        return privKey;
+      };
     }
 
-    // temp shim
-    if (!keyUtils.getPublicKey) {
-      keyUtils.getPublicKey = async function (txInput, i, inputs) {
-        if (!keyUtils.getPrivateKey) {
-          throw new Error("type assert: missing 'getPrivateKey'");
-        }
-        let privKey = await keyUtils.getPrivateKey(txInput, i, inputs);
-        if (!keyUtils.toPublicKey) {
-          throw new Error("type assert: missing 'toPublicKey'");
-        }
-        let pubKey = await keyUtils.toPublicKey(privKey);
-        if ("string" === typeof pubKey) {
-          throw new Error("publicKey must be given as a Uint8Array");
-        }
-        return pubKey;
-      };
+    function throwGetPrivateKeyError() {
+      if (false) {
+        return new Uint8Array(0);
+      }
+
+      const msg =
+        "getPrivateKey() is only valid for the lifetime of transaction signing process";
+      throw new Error(msg);
     }
 
     for (let i = 0; i < txInfo.inputs.length; i += 1) {
@@ -986,8 +971,11 @@ var DashTx = ("object" === typeof module && exports) || {};
 
       let pubKeyHex = txInput.publicKey;
       if (!pubKeyHex) {
-        let pubKey = await keyUtils.getPublicKey(txInput, i, txInfo.inputs);
+        let getPrivateKey = createGetPrivateKey(privKey);
+        let _txInput = Object.assign({}, { getPrivateKey }, txInput);
+        let pubKey = await keyUtils.getPublicKey(_txInput, i, txInfo.inputs);
         pubKeyHex = Tx.utils.bytesToHex(pubKey);
+        _txInput.getPrivateKey = throwGetPrivateKeyError;
       }
       if ("string" !== typeof pubKeyHex) {
         let warn = new Error("stack");
@@ -1255,12 +1243,7 @@ var DashTx = ("object" === typeof module && exports) || {};
       outputHex.push(satoshis);
 
       if (!output.pubKeyHash) {
-        if (!output.address) {
-          throw new Error(
-            `every output must have 'pubKeyHash' (or 'address' if base58check is loaded)`,
-          );
-        }
-        output.pubKeyHash = Tx.utils.addrToPubKeyHash(output.address);
+        throw new Error(`every output must have 'pubKeyHash' as a hex string`);
       }
       assertHex(output.pubKeyHash, `output[${i}].pubKeyHash`);
 
@@ -1438,25 +1421,6 @@ var DashTx = ("object" === typeof module && exports) || {};
   }
 
   /**
-   * @param {String} addr
-   * @returns {String} - pubKeyHash in the raw (hex)
-   */
-  TxUtils.addrToPubKeyHash = function (addr) {
-    let Base58Check =
-      //@ts-ignore
-      window.Base58Check || require("@dashincubator/base58check").Base58Check;
-    let b58c = Base58Check.create({
-      pubKeyHashVersion: "4c",
-      privateKeyVersion: "cc",
-    });
-
-    // XXX bad idea?
-    // using .decode to avoid the async of .verify
-    let parts = b58c.decode(addr);
-    return parts.pubKeyHash;
-  };
-
-  /**
    * @param {String} hex
    */
   TxUtils.hexToBytes = function (hex) {
@@ -1481,7 +1445,6 @@ var DashTx = ("object" === typeof module && exports) || {};
 
     return u8;
   };
-  TxUtils.hexToU8 = TxUtils.hexToBytes;
 
   /**
    * @param {String} hex
@@ -1494,28 +1457,6 @@ var DashTx = ("object" === typeof module && exports) || {};
 
     // ex: 0x03000000
     return hexLE.join("");
-  };
-
-  /** @type TxSign */
-  TxUtils.sign = async function signTx(privateKey, txHashBuf) {
-    let Secp256k1 =
-      //@ts-ignore
-      window.nobleSecp256k1 || require("@dashincubator/secp256k1");
-
-    let sigOpts = { canonical: true, extraEntropy: true };
-    let sigBuf = await Secp256k1.sign(txHashBuf, privateKey, sigOpts);
-    return sigBuf;
-  };
-
-  /** @type TxToPublicKey */
-  TxUtils.toPublicKey = function (privateKey) {
-    let Secp256k1 =
-      //@ts-ignore
-      window.nobleSecp256k1 || require("@dashincubator/secp256k1");
-
-    let isCompressed = true;
-    let pubKeyBuf = Secp256k1.getPublicKey(privateKey, isCompressed);
-    return pubKeyBuf;
   };
 
   /** @type TxToVarInt */
@@ -1645,7 +1586,6 @@ var DashTx = ("object" === typeof module && exports) || {};
 
     return hex.join("");
   };
-  TxUtils.u8ToHex = TxUtils.bytesToHex;
 
   /** @type {TxStringToHex} */
   TxUtils.strToHex = function (str) {
@@ -1688,10 +1628,10 @@ if ("object" === typeof module) {
 
 /**
  * @typedef TxDeps
+ * @prop {TxGetPrivateKey} getPrivateKey
+ * @prop {TxGetPublicKey} getPublicKey - efficiently get public key bytes
+ * @prop {TxToPublicKey} [toPublicKey] - convert private bytes to pub bytes
  * @prop {TxSign} sign
- * @prop {TxToPublicKey} [toPublicKey]
- * @prop {TxGetPrivateKey} [getPrivateKey]
- * @prop {TxGetPublicKey} [getPublicKey]
  */
 
 /**
@@ -1817,11 +1757,6 @@ if ("object" === typeof module) {
  * @prop {String} [address] - 0x76, 0xa9, base58check bytes
  */
 
-/**
- * @typedef TxSignOptions
- * @prop {TxGetPrivateKey} getPrivateKey
- */
-
 // Func Defs
 
 /**
@@ -1913,7 +1848,7 @@ if ("object" === typeof module) {
 /**
  * @callback TxHashAndSignAll
  * @param {TxInfo} txInfo
- * @param {Array<TxPrivateKey>|TxSignOptions} [keys]
+ * @param {Array<TxPrivateKey>} [keys]
  */
 
 /**

@@ -3,17 +3,21 @@
 let Zora = require("zora");
 
 let Secp256k1 = require("@dashincubator/secp256k1");
+let DashKeys = require("dashkeys");
 
 let DashTx = require("../dashtx.js");
 let dashTx = DashTx.create({
-  sign: async function (privateKey, hash) {
+  sign: async function (privKeyBytes, hashBytes) {
     let sigOpts = {
       canonical: true,
       // ONLY FOR TESTING: use deterministic signature (rather than random)
       extraEntropy: null,
     };
-    let sigBuf = await Secp256k1.sign(hash, privateKey, sigOpts);
+    let sigBuf = await Secp256k1.sign(hashBytes, privKeyBytes, sigOpts);
     return sigBuf;
+  },
+  toPublicKey: async function (privKeyBytes) {
+    return DashKeys.utils.toPublicKey(privKeyBytes);
   },
 });
 
