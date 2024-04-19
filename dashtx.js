@@ -392,7 +392,7 @@ var DashTx = ("object" === typeof module && exports) || {};
       }
       if (!hasEntropy) {
         let err = new Error(
-          "secp265k1 implementation does not use signature entropy",
+          "secp256k1 implementation does not use signature entropy",
         );
         Object.assign(err, { code: "E_NO_ENTROPY" });
         throw err;

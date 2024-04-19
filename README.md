@@ -479,7 +479,7 @@ Tx.create({ sign, getPrivateKey });
  * These may or may not be the default options, depending
  * on the library used.
  *
- * We recommend @dashincubator/secp246k1 and @noble/secp246k1.
+ * We recommend @dashincubator/secp256k1 and @noble/secp256k1.
  *
  * @param {Uint8Array} privateKey - an input's corresponding key
  * @param {Uint8Array} txHashBytes - the (not reversed) 2x-sha256-hash
