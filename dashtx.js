@@ -55,7 +55,7 @@
 
 /**
  * @callback TxCreate
- * @param {TxDeps} myUtils
+ * @param {TxDeps} keyUtils
  * @returns {tx}
  */
 
@@ -230,10 +230,10 @@ var DashTx = ("object" === typeof module && exports) || {};
     return sats;
   };
 
-  Tx.create = function (myUtils) {
+  Tx.create = function (_keyUtils) {
     let txInst = {};
 
-    txInst._utils = Object.assign({}, Tx.utils, myUtils);
+    txInst._utils = Object.assign({}, Tx.utils, _keyUtils);
 
     /** @type {TxHashAndSignAll} */
     txInst.hashAndSignAll = async function (txInfo, keys) {
@@ -746,11 +746,11 @@ var DashTx = ("object" === typeof module && exports) || {};
   };
 
   /**
-   * @param {TxDeps} myUtils
+   * @param {TxDeps} keyUtils
    * @param {Array<TxPrivateKey>} keys
    */
-  Tx._createKeyUtils = function (myUtils, keys) {
-    let _getPublicKey = myUtils.getPublicKey || getPublicKey;
+  Tx._createKeyUtils = function (keyUtils, keys) {
+    let _getPublicKey = keyUtils.getPublicKey || getPublicKey;
     let _utils = {
       /** @type {TxGetPrivateKey} */
       getPrivateKey: async function (_, i) {
@@ -759,16 +759,16 @@ var DashTx = ("object" === typeof module && exports) || {};
       },
       /** @type {TxGetPublicKey} */
       getPublicKey: _getPublicKey,
-      sign: myUtils.sign,
+      sign: keyUtils.sign,
     };
 
     /** @type {TxGetPublicKey} */
     async function getPublicKey(txInput, i, txInputs) {
       let privKey = keys[i];
-      if (!myUtils.toPublicKey) {
+      if (!keyUtils.toPublicKey) {
         throw new Error("type assert: missing 'toPublicKey'");
       }
-      let pubKey = myUtils.toPublicKey(privKey);
+      let pubKey = keyUtils.toPublicKey(privKey);
       if ("string" === typeof pubKey) {
         console.warn(
           "oops, you gave a publicKey as hex (deprecated) rather than a buffer",
@@ -778,7 +778,7 @@ var DashTx = ("object" === typeof module && exports) || {};
       return pubKey;
     }
 
-    return Object.assign(_utils, myUtils);
+    return Object.assign(_utils, keyUtils);
   };
 
   /**
@@ -903,7 +903,7 @@ var DashTx = ("object" === typeof module && exports) || {};
    * TODO _param {Array<TxOutput>} txInfo.outputs
    * TODO _param {Uint32} [txInfo.version]
    * TODO _param {Boolean} [txInfo._debug] - bespoke debug output
-   * @param {TxDeps} myUtils
+   * @param {TxDeps} keyUtils
    * @returns {Promise<TxInfoSigned>}
    */
   Tx._hashAndSignAll = async function (txInfo, keyUtils) {
@@ -937,6 +937,8 @@ var DashTx = ("object" === typeof module && exports) || {};
       inputs: [],
       outputs: txInfo.outputs,
       version: txInfo.version || CURRENT_VERSION,
+      locktime: txInfo.locktime || 0x00,
+      transaction: "",
     };
 
     // temp shim
