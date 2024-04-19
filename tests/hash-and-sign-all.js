@@ -75,7 +75,7 @@ let txInfo = {
 
 Zora.test("reproduce known rawtx", async function (t) {
   let keysMap = {};
-  keysMap[prevLockScript] = Tx.utils.hexToU8(privKeyHex);
+  keysMap[prevLockScript] = Tx.utils.hexToBytes(privKeyHex);
 
   let tx = Tx.create({
     sign: async function (privateKey, hash) {

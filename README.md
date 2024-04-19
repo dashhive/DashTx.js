@@ -304,8 +304,6 @@ Tx.hashPartial(txHex, Tx.SIGHASH_ALL);
 
 // Deprecated
 Tx.createLegacyTx(coins, outputs, changeOutput);
-Tx.utils.hexToU8 // Tx.utils.hexToBytes;
-Tx.utils.u8ToHex // Tx.utils.bytesToHex;
 
 // Not API-locked, May change
 Tx.utils.sign(privKeyBytes, txHashBytes);

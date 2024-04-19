@@ -43,14 +43,14 @@ Secp256k1.utils.hmacSha256 = async function (key, message) {
 /* jshint maxstatements: 200 */
 async function main() {
   //let expectedBytes = "00ff0ff0fff00f00";
-  //let u8 = Tx.utils.hexToU8("00ff0ff0fff00f00");
+  //let u8 = Tx.utils.hexToBytes("00ff0ff0fff00f00");
   //console.log(u8);
 
   let isCompressed = true;
   let sigHashType = 0x01;
 
   //let rndPrivKey = Secp256k1.utils.randomPrivateKey();
-  //console.log("Random Private Key", Tx.utils.u8ToHex(rndPrivKey));
+  //console.log("Random Private Key", Tx.utils.bytesToHex(rndPrivKey));
 
   let btcRawTxIn = {
     version: 1,
@@ -85,21 +85,21 @@ async function main() {
   let btcTxHashBuf = await Tx.hashPartial(btcSignableTxHex, sigHashType);
   console.log();
   console.log("Signable BTC Tx Hash");
-  console.log(Tx.utils.u8ToHex(btcTxHashBuf));
+  console.log(Tx.utils.bytesToHex(btcTxHashBuf));
   console.log();
 
   // From https://bitcointalk.org/index.php?topic=651344.0
   // cSf2Lcme2kSpkZ1s5AW8a2K2Y41P8HYGoXAevNzPUna6iXDw9boC
   let btcPrivKeyHex =
     "976917491dd96b045af13e5cf5dd81013682974f20c8a78de9f7873bb39620e8";
-  let privKeyU8 = Tx.utils.hexToU8(btcPrivKeyHex);
-  //console.log("pk", Tx.utils.u8ToHex(privKey));
+  let privKeyU8 = Tx.utils.hexToBytes(btcPrivKeyHex);
+  //console.log("pk", Tx.utils.bytesToHex(privKey));
   let btcSig = await Secp256k1.sign(btcTxHashBuf, privKeyU8, {
     canonical: false,
   });
   let btcPub = Secp256k1.getPublicKey(privKeyU8, isCompressed);
-  let btcSigHex = Tx.utils.u8ToHex(btcSig);
-  let btcPubHex = Tx.utils.u8ToHex(btcPub);
+  let btcSigHex = Tx.utils.bytesToHex(btcSig);
+  let btcPubHex = Tx.utils.bytesToHex(btcPub);
 
   console.log("Signature");
   console.log(btcSigHex);
@@ -198,16 +198,16 @@ async function main() {
   console.log();
   console.log("Magic Signable Tx Hashes");
   for (let dashTxHashBuf of dashTxHashBufs) {
-    console.log(Tx.utils.u8ToHex(dashTxHashBuf));
+    console.log(Tx.utils.bytesToHex(dashTxHashBuf));
   }
   console.log();
 
   // TODO output u8 instead of hex
   let privKeyHex =
     "d4c569f71ea2a9be6010cb3691f2757bc9539c60fd87e8bed21d7844d7b9b246";
-  let privKey = Tx.utils.hexToU8(privKeyHex);
+  let privKey = Tx.utils.hexToBytes(privKeyHex);
   console.log(privKey);
-  //console.log("pk", Tx.utils.u8ToHex(privKey));
+  //console.log("pk", Tx.utils.bytesToHex(privKey));
 
   /** @typedef {import('./tx.js').TxInputHashable} TxInputHashable */
   /** @typedef {import('./tx.js').TxInputSigned} TxInputSigned */
@@ -224,11 +224,11 @@ async function main() {
 
     let sig = await Secp256k1.sign(dashTxHashBuf, privKey, { canonical: true });
     let pub = Secp256k1.getPublicKey(privKey, isCompressed);
-    let dashSigHex = Tx.utils.u8ToHex(sig);
-    let dashPubHex = Tx.utils.u8ToHex(pub);
+    let dashSigHex = Tx.utils.bytesToHex(sig);
+    let dashPubHex = Tx.utils.bytesToHex(pub);
 
     console.log(`Tx Hash [${i}]`);
-    console.log(Tx.utils.u8ToHex(dashTxHashBuf));
+    console.log(Tx.utils.bytesToHex(dashTxHashBuf));
     console.log(`Signature [${i}]`);
     console.log(dashSigHex);
     console.log(`Public Key [${i}]`);
