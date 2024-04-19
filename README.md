@@ -26,60 +26,166 @@ Server and browser compatible. Vanilla JS. 0 Dependencies.
 npm install --save @dashincubator/secp256k1
 npm install --save dashkeys
 npm install --save dashtx
+npm install --save dashkeys
 ```
 
-Note: You may provide your own `sign()` function, as shown below.
+Note: You must provide your own _Key Util_ functions, as shown below.
 
 ```js
 "use strict";
 
-let Tx = require("dashtx");
-let tx = Tx.create({ sign: sign });
-
+let DashKeys = require("dashkeys");
+let DashTx = require("dashtx");
 let Secp256k1 = require("@dashincubator/secp256k1");
 
-async function sign(privKeyBytes, hashBytes) {
-  let sigOpts = { canonical: true, extraEntropy: true };
-  let sigBytes = await Secp256k1.sign(hashBytes, privKeyBytes, sigOpts);
-  return sigBytes;
-}
+let yourWalletKeyDataMapGoesHere = {
+  /* SEE BELOW */
+};
 
-// ...
+let keyUtils = {
+  /* SEE BELOW */
+};
+let dashTx = DashTx.create(keyUtils);
+
+let inputs = [{ outputIndex, publicKey, txid /*, optional addr/pkh/hdpath */ }];
+let outputs = [{ satoshis, pubKeyHash /*, optional addr/hdpath/etc */ }];
+let txInfo = { inputs, outputs };
+
+// Sorted as per "Lexicographical Indexing of Transaction Inputs and Outputs"
+txInfo.inputs.sort(DashTx.sortInputs);
+txInfo.outputs.sort(DashTx.sortOutputs);
+
+let txInfoSigned = await dashTx.hashAndSignAll(txInfo);
+
+console.info(JSON.stringify(txInfo, null, 2));
+console.info(txInfo.transaction);
 ```
 
 ## Browsers
 
 ```html
 <script src="https://unpkg.com/@dashincubator/secp256k1/secp256k1.js"></script>
+<script src="https://unpkg.com/dashkeys/dashkeys.js"></script>
 <script src="https://unpkg.com/dashtx/dashtx.js"></script>
 ```
 
-Note: You must provide your own `sign()` function, as shown below.
+Note: You must provide your own _Key Util_ functions, as shown below.
 
 ```js
-(function () {
+(async function () {
   "use strict";
 
-  let Tx = window.DashTx;
-  let tx = Tx.create({ sign: sign });
-
+  let DashKeys = window.DashTx;
+  let DashTx = window.DashKeys;
   let Secp256k1 = window.nobleSecp256k1;
 
-  async function sign(privKeyBytes, hashBytes) {
-    let sigOpts = { canonical: true, extraEntropy: true };
-    let sigBytes = await Secp256k1.sign(hashBytes, privKeyBytes, sigOpts);
-    return sigBytes;
-  }
+  let yourWalletKeyDataMapGoesHere = {
+    /* SEE BELOW */
+  };
+
+  let keyUtils = {
+    /* SEE BELOW */
+  };
+  let dashTx = DashTx.create(keyUtils);
+
+  let inputs = [
+    { outputIndex, publicKey, txid /*, optional addr/pkh/hdpath */ },
+  ];
+  let outputs = [{ satoshis, pubKeyHash /*, optional addr/hdpath/etc */ }];
+  let txInfo = { inputs, outputs };
+
+  // Sorted as per "Lexicographical Indexing of Transaction Inputs and Outputs"
+  txInfo.inputs.sort(DashTx.sortInputs);
+  txInfo.outputs.sort(DashTx.sortOutputs);
+
+  let txInfoSigned = await dashTx.hashAndSignAll(txInfo);
+
+  console.info(JSON.stringify(txInfo, null, 2));
+  console.info(txInfo.transaction);
 
   // ...
 })();
 ```
 
-## Example Usage
+## Example Wallet Key Data
+
+DashTx does not depend on any specific implementation of a wallet key storage
+engine, but it works great with plain-old JSON:
+
+```js
+let yourWalletKeyMapGoesHere = {
+  yTw3SFk9PbQ1kikMgJBRA7CFyLfNt2G6QD: {
+    hdpath: "0bGYi3S7n2Q|m/44'/1'/0'/0/0",
+    address: "yTw3SFk9PbQ1kikMgJBRA7CFyLfNt2G6QD",
+    wif: "cUeUEgRQWfKiYPBeRZsYsrvvSZiKHbUNqiQE2AdKA4s7ymycdVxc",
+  },
+  yb4zn8MSW4hHsvmP6PxX2tUPDb9bvmxSrS: {
+    hdpath: "0bGYi3S7n2Q|m/44'/1'/0'/0/1",
+    wif: "cN28SZpmmuVFmmBQBHCNdwa6a14kWZM8VVpZETjzk47aGNvVGXK7",
+    address: "yb4zn8MSW4hHsvmP6PxX2tUPDb9bvmxSrS",
+  },
+  yfrB4v4cih7os6t1tg4YuWkrTYmHyMHkZb: {
+    hdpath: "0bGYi3S7n2Q|m/44'/1'/0'/0/2",
+    address: "yfrB4v4cih7os6t1tg4YuWkrTYmHyMHkZb",
+    wif: "cQBHjCxspabNZKGMK3gbuvSLgssqSxAuDsaMMDuzgXioYyR723Bg",
+  },
+  // ...
+};
+```
+
+You can use any indexing, query, or storage strategy you like, with values in
+Base58Check, Hex, Byte, or whatever else you fancy - just as long as your
+provided _Key Util_ functions can convert them.
+
+## Example Key Utils
+
+DashTx does not depend on any specific implementation of signing or key
+transformation, but it works greeat **NobleSecp256k1** and **DashKeys**:
+
+```text
+getPrivateKey(txInput, i)
+getPublicKey(txInput, i)
+sign(privKeyBytes, txHashBytes)
+toPublicKey(privKeyBytes)
+```
+
+```js
+let keyUtils = {
+  getPrivateKey: async function (txInput, i) {
+    let pkhBytes = DashKeys.utils.hexToBytes(txInput.pubKeyHash);
+    let address = await DashKeys.pkhToAddr(txInput.pubKeyHash);
+
+    let yourKeyData = yourWalletKeyMapGoesHere[address];
+
+    let privKeyBytes = DashKeys.wifToPrivKey(yourKeyData.wif);
+    return privKeyBytes;
+  },
+
+  getPublicKey: async function (txInput, i) {
+    let privKeyBytes = getPrivateKey(txInput, i);
+    let publicKey = await keyUtils.toPublicKey(privKeyBytes);
+
+    return publicKey;
+  },
+
+  sign: async function (privKeyBytes, txHashBytes) {
+    let sigOpts = { canonical: true, extraEntropy: true };
+    let sigBytes = await Secp256k1.sign(txHashBytes, privKeyBytes, sigOpts);
+
+    return sigBytes;
+  },
+
+  toPublicKey: async function (privKeyBytes) {
+    let isCompressed = true;
+    let pubKeyBytes = Secp256k1.getPublicKey(privateKey, isCompressed);
+    return pubKeyBytes;
+  },
+};
+```
+
+## Example Tx Info
 
 See also: [example.js](/example.js).
-
-Note: You must provide your own `sign()` function, as shown above.
 
 ```js
 let memo = Tx.utils.strToHex("Hello, Dash!");
@@ -114,7 +220,6 @@ let txInfo = {
 txInfo.inputs.sort(Tx.sortInputs);
 txInfo.outputs.sort(Tx.sortOutputs);
 
-let keys = txInfo.inputs.map(getPrivateKey);
 let txInfoSigned = await tx.hashAndSignAll(txInfo);
 
 console.info(JSON.stringify(txInfo, null, 2));
@@ -160,7 +265,6 @@ let txInfo = {
 txInfo.inputs.sort(Tx.sortInputs);
 txInfo.outputs.sort(Tx.sortOutputs);
 
-let keys = txInfo.inputs.map(getPrivateKey);
 let txInfoSigned = await tx.hashAndSignAll(txInfo);
 
 console.info(JSON.stringify(txInfo, null, 2));
@@ -278,7 +382,7 @@ Tx.OUTPUT_SIZE         //          34
 ```
 
 ```text
-Tx.create({ sign, getPrivateKey });
+Tx.create({ getPrivateKey, getPublicKey, sign, toPublicKey });
     tx.hashAndSignAll(txInfo);
     tx.legacy.draftSingleOutput({ utxos, inputs, output });
     tx.legacy.finalizePresorted(txDraft, keys);
@@ -304,18 +408,13 @@ Tx.hashPartial(txHex, Tx.SIGHASH_ALL);
 
 // Deprecated
 Tx.createLegacyTx(coins, outputs, changeOutput);
-
-// Not API-locked, May change
-Tx.utils.sign(privKeyBytes, txHashBytes);
-Tx.utils.toPublicKey(privKeyBytes);
-Tx.utils.addrToPubKeyHash(addr);
 ```
 
 ```js
 /**
  * Creates a tx signer instance.
  */
-Tx.create({ sign, getPrivateKey });
+Tx.create({ getPrivateKey, getPublicKey, sign, toPublicKey });
 
 /**
  * Estimates the min, mid, and max sizes of (fees for) a transaction (including memos).
@@ -469,26 +568,7 @@ Tx.utils.strToHex(str);
 ### You-do-It Functions
 
 ```js
-Tx.create({ sign, getPrivateKey });
-
-/**
- * Sign a 256-bit hash. 'canonical' form is required for
- * blockchains. Must return the signature as an ASN.1 DER.
- * These may or may not be the default options, depending
- * on the library used.
- *
- * We recommend @dashincubator/secp256k1 and @noble/secp256k1.
- *
- * @param {Uint8Array} privateKey - an input's corresponding key
- * @param {Uint8Array} txHashBytes - the (not reversed) 2x-sha256-hash
- * @returns {String} - hex representation of an ASN.1 signature
- */
-async function sign(privateKey, txHashBytes) {
-  let sigOpts = { canonical: true };
-  let sigBytes = await Secp256k1.sign(txHashBytes, privateKey, sigOpts);
-
-  return Tx.utils.bytesToHex(sigBytes);
-}
+Tx.create({ getPrivateKey, getPublicKey, sign, toPublicKey });
 
 /**
  * Given information that you provided about an input
@@ -504,10 +584,47 @@ async function sign(privateKey, txHashBytes) {
  * @returns {Uint8Array} - the private key bytes
  */
 async function getPrivateKey(txInput, i) {
-  let address = await DashKeys.pubkeyToAddr(txInput.publicKey);
-  let privateKey = privateKeys[address];
+  let pkhBytes = DashKeys.utils.hexToBytes(txInput.pubKeyHash);
+  let address = await DashKeys.pkhToAddr(txInput.pubKeyHash);
+  let privKeyBytes = privateKeys[address];
 
-  return privateKey;
+  return privKeyBytes;
+}
+
+async function getPublicKey(txInput, i) {
+  let privKeyBytes = getPrivateKey(txInput, i);
+  let publicKey = await toPublicKey(privKeyBytes);
+
+  return publicKey;
+}
+
+let Secp256k1 =
+  //@ts-ignore
+  window.nobleSecp256k1 || require("@dashincubator/secp256k1");
+
+/**
+ * Sign a 256-bit hash. 'canonical' form is required for
+ * blockchains. Must return the signature as an ASN.1 DER.
+ * These may or may not be the default options, depending
+ * on the library used.
+ *
+ * We recommend @dashincubator/secp256k1 and @noble/secp256k1.
+ *
+ * @param {Uint8Array} privateKey - an input's corresponding key
+ * @param {Uint8Array} txHashBytes - the (not reversed) 2x-sha256-hash
+ * @returns {String} - hex representation of an ASN.1 signature
+ */
+async function sign(privKeyBytes, txHashBytes) {
+  let sigOpts = { canonical: true, extraEntropy: true };
+  let sigBytes = await Secp256k1.sign(txHashBytes, privKeyBytes, sigOpts);
+
+  return sigBytes;
+}
+
+async function toPublicKey(privKeyBytes) {
+  let isCompressed = true;
+  let pubKeyBytes = Secp256k1.getPublicKey(privateKey, isCompressed);
+  return pubKeyBytes;
 }
 ```
 
