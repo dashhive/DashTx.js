@@ -1,7 +1,23 @@
 "use strict";
 
-let DashKeys = require("dashkeys");
 let DashTx = require("../");
+
+let DashKeys = require("dashkeys");
+let Secp256k1 = require("@dashincubator/secp256k1");
+
+let keyUtils = {
+  sign: async function (privKeyBytes, hashBytes) {
+    let sigOpts = {
+      canonical: true,
+      extraEntropy: true,
+    };
+    let sigBuf = await Secp256k1.sign(hashBytes, privKeyBytes, sigOpts);
+    return sigBuf;
+  },
+  toPublicKey: async function (privKeyBytes) {
+    return DashKeys.utils.toPublicKey(privKeyBytes);
+  },
+};
 
 // generated with https://webinstall.dev/dashmsg
 // dashmsg gen --cointype '4c' ./test-1.wif
@@ -74,7 +90,7 @@ function genTestVals(name, sats, deterministic) {
 
 async function testAll() {
   async function setupAndRunOne(original) {
-    let dashTx = DashTx.create();
+    let dashTx = DashTx.create(keyUtils);
     let t1 = JSON.parse(JSON.stringify(original));
     let t2 = JSON.parse(JSON.stringify(original));
     let txDraft = dashTx.legacy.draftSingleOutput({
@@ -104,15 +120,13 @@ async function testAll() {
       output.pubKeyHash = DashKeys.utils.bytesToHex(pkhBytes);
     }
 
-    let dashTxOpts = {};
+    let _keyUtils = Object.assign({}, keyUtils);
     let rndIters = 10;
     if (original.deterministic) {
-      dashTxOpts = {
-        sign: createNonRndSigner(),
-      };
+      _keyUtils.sign = createNonRndSigner();
       rndIters = 2;
     }
-    let myDashTx = DashTx.create(dashTxOpts);
+    let myDashTx = DashTx.create(_keyUtils);
 
     await testOne(myDashTx, t2, txDraft, keys, rndIters).catch(function (err) {
       console.info(`# failed ${t1.name}`);
