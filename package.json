@@ -1,6 +1,6 @@
 {
   "name": "dashtx",
-  "version": "0.14.1",
+  "version": "0.14.3",
   "description": "Create DASH Transactions with Vanilla JS (0 deps, cross-platform)",
   "main": "index.js",
   "files": [
