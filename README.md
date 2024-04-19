@@ -24,6 +24,7 @@ Server and browser compatible. Vanilla JS. 0 Dependencies.
 
 ```sh
 npm install --save @dashincubator/secp256k1
+npm install --save dashkeys
 npm install --save dashtx
 ```
 
