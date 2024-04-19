@@ -215,11 +215,14 @@ var DashTx = ("object" === typeof module && exports) || {};
 
     /** @type {TxHashAndSignAll} */
     txInst.hashAndSignAll = async function (txInfo, keys) {
+      // { getPublicKey, getPrivateKey, sign, toPublicKey }
+      let keyUtils = Object.assign({}, txInst._utils);
+
       if (keys) {
         //@ts-ignore
         if (keys.getPrivateKey) {
           //@ts-ignore
-          txInst._utils.getPrivateKey = keys.getPrivateKey;
+          keyUtils.getPrivateKey = keys.getPrivateKey;
         }
         //@ts-ignore
         else if (keys.length !== txInfo.inputs.length) {
@@ -227,11 +230,11 @@ var DashTx = ("object" === typeof module && exports) || {};
             `the number and order of 'keys' must match number of 'inputs' - each 'utxo' of the provided private key must be matched to that private key`,
           );
         } else {
-          txInst._utils = Tx._createKeyUtils(txInst._utils, keys);
+          keyUtils = Tx._createKeyUtils(keyUtils, keys);
         }
       }
 
-      return await Tx._hashAndSignAll(txInfo, txInst._utils);
+      return await Tx._hashAndSignAll(txInfo, keyUtils);
     };
 
     txInst.legacy = {};
@@ -881,7 +884,7 @@ var DashTx = ("object" === typeof module && exports) || {};
    * @param {TxDeps} myUtils
    * @returns {Promise<TxInfoSigned>}
    */
-  Tx._hashAndSignAll = async function (txInfo, myUtils) {
+  Tx._hashAndSignAll = async function (txInfo, keyUtils) {
     let sortedInputs = txInfo.inputs.slice(0);
     sortedInputs.sort(Tx.sortInputs);
     for (let i = 0; i < sortedInputs.length; i += 1) {
@@ -919,21 +922,21 @@ var DashTx = ("object" === typeof module && exports) || {};
     };
 
     // temp shim
-    if (!myUtils.getPrivateKey) {
+    if (!keyUtils.getPrivateKey) {
       throw new Error(`you must provide 'keys' or 'getPrivateKey()'`);
     }
 
     // temp shim
-    if (!myUtils.getPublicKey) {
-      myUtils.getPublicKey = async function (txInput, i, inputs) {
-        if (!myUtils.getPrivateKey) {
+    if (!keyUtils.getPublicKey) {
+      keyUtils.getPublicKey = async function (txInput, i, inputs) {
+        if (!keyUtils.getPrivateKey) {
           throw new Error("type assert: missing 'getPrivateKey'");
         }
-        let privKey = await myUtils.getPrivateKey(txInput, i, inputs);
-        if (!myUtils.toPublicKey) {
+        let privKey = await keyUtils.getPrivateKey(txInput, i, inputs);
+        if (!keyUtils.toPublicKey) {
           throw new Error("type assert: missing 'toPublicKey'");
         }
-        let pubKey = await myUtils.toPublicKey(privKey);
+        let pubKey = await keyUtils.toPublicKey(privKey);
         if ("string" === typeof pubKey) {
           throw new Error("publicKey must be given as a Uint8Array");
         }
@@ -948,9 +951,9 @@ var DashTx = ("object" === typeof module && exports) || {};
       let _sigHashType = txInput.sigHashType ?? Tx.SIGHASH_ALL;
       let txHashable = Tx.createHashable(txInfo, i);
       let txHashBuf = await Tx.hashPartial(txHashable, _sigHashType);
-      let privKey = await myUtils.getPrivateKey(txInput, i, txInfo.inputs);
+      let privKey = await keyUtils.getPrivateKey(txInput, i, txInfo.inputs);
 
-      let sigBuf = await myUtils.sign(privKey, txHashBuf);
+      let sigBuf = await keyUtils.sign(privKey, txHashBuf);
       let sigHex = Tx.utils.bytesToHex(sigBuf);
       if ("string" === typeof sigBuf) {
         console.warn(`sign() should return a Uint8Array of an ASN.1 signature`);
@@ -959,7 +962,7 @@ var DashTx = ("object" === typeof module && exports) || {};
 
       let pubKeyHex = txInput.publicKey;
       if (!pubKeyHex) {
-        let pubKey = await myUtils.getPublicKey(txInput, i, txInfo.inputs);
+        let pubKey = await keyUtils.getPublicKey(txInput, i, txInfo.inputs);
         pubKeyHex = Tx.utils.bytesToHex(pubKey);
       }
       if ("string" !== typeof pubKeyHex) {
