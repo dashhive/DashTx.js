@@ -641,11 +641,13 @@ var DashTx = ("object" === typeof module && exports) || {};
    * - ASC `outputIndex` (a.k.a. `output_index`, `vout`)
    */
   Tx.sortInputs = function (a, b) {
+    let aTxid = a.txid || a.txId;
+    let bTxid = b.txid || b.txId;
     // Ascending Lexicographical on TxId (prev-hash) in-memory (not wire) byte order
-    if (a.txId > b.txId) {
+    if (aTxid > bTxid) {
       return 1;
     }
-    if (a.txId < b.txId) {
+    if (aTxid < bTxid) {
       return -1;
     }
 
@@ -998,7 +1000,8 @@ var DashTx = ("object" === typeof module && exports) || {};
 
       /** @type TxInputSigned */
       let txInputSigned = {
-        txId: txInput.txId,
+        txId: txInput.txId || txInput.txid,
+        txid: txInput.txId || txInput.txid,
         outputIndex: txInput.outputIndex,
         signature: sigHex,
         publicKey: pubKeyHex,
@@ -1051,7 +1054,8 @@ var DashTx = ("object" === typeof module && exports) || {};
     txInfoHashable.inputs = txInfo.inputs.map(function (input, i) {
       if (inputIndex !== i) {
         return {
-          txId: input.txId,
+          txId: input.txId || input.txid,
+          txid: input.txId || input.txid,
           outputIndex: input.outputIndex,
         };
       }
@@ -1066,7 +1070,8 @@ var DashTx = ("object" === typeof module && exports) || {};
         lockScript = `${OP_DUP}${OP_HASH160}${PKH_SIZE}${input.pubKeyHash}${OP_EQUALVERIFY}${OP_CHECKSIG}`;
       }
       return {
-        txId: input.txId,
+        txId: input.txId || input.txid,
+        txid: input.txId || input.txid,
         outputIndex: input.outputIndex,
         pubKeyHash: input.pubKeyHash,
         sigHashType: input.sigHashType,
@@ -1134,7 +1139,7 @@ var DashTx = ("object" === typeof module && exports) || {};
     for (let input of inputs) {
       let inputHex = [];
 
-      let txId = input.txId;
+      let txId = input.txId || input.txid;
       if (!txId) {
         throw new Error("missing required utxo property 'txId'");
       }
