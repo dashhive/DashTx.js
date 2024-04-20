@@ -194,12 +194,12 @@ var DashTx = ("object" === typeof module && exports) || {};
     let size = 0;
 
     for (let output of outputs) {
-      if (output.message) {
+      if ("string" === typeof output.message) {
         if (!output.memo) {
           output.memo = TxUtils.strToHex(output.message);
         }
       }
-      if (output.memo) {
+      if ("string" === typeof output.memo) {
         let memoSize = output.memo.length / 2;
         if (memoSize > MAX_U8) {
           size += 2;
