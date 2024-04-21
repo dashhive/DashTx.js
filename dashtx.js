@@ -8,7 +8,8 @@
  * @prop {Uint32} MAX_INPUT_PAD - 2 (possible ASN.1 BigInt padding)
  * @prop {Uint32} MAX_INPUT_SIZE - 149 each (with padding)
  * @prop {Uint32} OUTPUT_SIZE - 34 each
- * @prop {Uint32} SIGHASH_ALL - 0x01
+ * @prop {Uint32|0x00000001} SIGHASH_ALL - 0x01
+ * @prop {Uint32|0x00000080} SIGHASH_ANYONECANPAY - 0x80
  * @prop {TxAppraise} appraise
  * @prop {TxAppraiseCounts} _appraiseCounts
  * @prop {TxAppraiseMemos} _appraiseMemos
@@ -22,6 +23,10 @@
  * @prop {TxGetId} getId - only useful for fully signed tx
  * @prop {TxHashPartial} hashPartial - useful for computing sigs
  * @prop {TxCreateLegacyTx} createLegacyTx
+ * @prop {TxParseUnknown} parseUnknown
+ * @prop {TxParseRequest} parseRequest
+ * @prop {TxParseHashable} parseHashable
+ * @prop {TxParseSigned} parseSigned
  * @prop {TxSortBySats} sortBySatsAsc
  * @prop {TxSortBySats} sortBySatsDsc
  * @prop {TxSortInputs} sortInputs
@@ -32,12 +37,14 @@
  * @prop {Function} _create
  * @prop {Function} _createInsufficientFundsError
  * @prop {Function} _createMemoScript
+ * @prop {Function} _debugPrint
  * @prop {Function} _hash
  * @prop {Function} _hashAndSignAll
  * @prop {Function} _legacyMustSelectInputs
  * @prop {Function} _legacySelectOptimalUtxos
  * @prop {Function} _packInputs
  * @prop {Function} _packOutputs
+ * @prop {Function} _parse
  */
 
 /**
@@ -110,6 +117,8 @@ var DashTx = ("object" === typeof module && exports) || {};
   //@ts-ignore - for debug only
   Tx._OP_CHECKSIG_HEX = OP_CHECKSIG;
   //@ts-ignore - for debug only
+  Tx._OP_RETURN_HEX = OP_RETURN;
+  //@ts-ignore - for debug only
   Tx._PKH_SIZE_HEX = PKH_SIZE;
   //@ts-ignore - for debug only
   Tx._PKH_SCRIPT_SIZE_HEX = PKH_SCRIPT_SIZE;
@@ -153,6 +162,7 @@ var DashTx = ("object" === typeof module && exports) || {};
     25; // lockscript
 
   Tx.SIGHASH_ALL = 0x01;
+  Tx.SIGHASH_ANYONECANPAY = 0x80;
 
   Tx.appraise = function (txInfo) {
     let extraSize = Tx._appraiseMemos(txInfo.outputs);
@@ -1368,8 +1378,6 @@ var DashTx = ("object" === typeof module && exports) || {};
       let sigHashTypeHex = TxUtils._toUint32LE(sigHashType);
       txSignable = `${txSignable}${sigHashTypeHex}`;
     }
-    //console.log("Signable Tx Hex");
-    //console.log(txSignable);
 
     let u8 = Tx.utils.hexToBytes(txSignable);
     //console.log("Signable Tx Buffer");
@@ -1395,6 +1403,251 @@ var DashTx = ("object" === typeof module && exports) || {};
     //console.log(hashU8);
 
     return hashU8;
+  };
+
+  /**
+   * @param {String} txHex
+   */
+  Tx.parseUnknown = function (txHex) {
+    /**@type {TxInfo}*/
+    //@ts-ignore
+    let txInfo = {};
+    try {
+      void Tx._parse(txHex, txInfo);
+    } catch (e) {
+      /**@type {Error}*/
+      //@ts-ignore - trust me bro, it's an error
+      let err = e;
+      Object.assign(err, {
+        code: "E_TX_PARSE",
+        transaction: txInfo,
+      });
+      let msg =
+        "parse failed, try ./DashTx.js/bin/inpsect.js <tx.hex> for detail";
+      err.message += `\n${msg}`;
+      throw err;
+    }
+
+    return txInfo;
+  };
+
+  /**
+   * @param {Object<String, any>} tx
+   * @param {String} hex
+   */
+  Tx._parse = function (hex, tx = {}) {
+    /* jshint maxstatements: 200 */
+    tx.hasInputScript = false;
+    tx.totalSatoshis = 0;
+
+    tx.offset = 0;
+
+    tx.versionHex = hex.substr(tx.offset, 8);
+    let versionHexRev = Tx.utils.reverseHex(tx.versionHex);
+    tx.version = parseInt(versionHexRev, 16);
+    tx.offset += 8;
+
+    let [numInputs, numInputsSize] = TxUtils._parseVarIntHex(hex, tx.offset);
+    tx.offset += numInputsSize;
+    tx.numInputsHex = numInputs.toString(16);
+    tx.numInputsHex = tx.numInputsHex.padStart(2, "0");
+    tx.numInputs = numInputs;
+
+    tx.inputs = [];
+    for (let i = 0; i < numInputs; i += 1) {
+      let input = {};
+      tx.inputs.push(input);
+
+      input.txidHex = hex.substr(tx.offset, 64);
+      input.txid = Tx.utils.reverseHex(input.txidHex);
+      input.txId = input.txid; // TODO
+      tx.offset += 64;
+
+      input.outputIndexHex = hex.substr(tx.offset, 8);
+      let outputIndexHexLe = Tx.utils.reverseHex(input.outputIndexHex);
+      input.outputIndex = parseInt(outputIndexHexLe, 16);
+      tx.offset += 8;
+
+      // TODO VarInt
+      input.scriptSizeHex = hex.substr(tx.offset, 2);
+      input.scriptSize = parseInt(input.scriptSizeHex, 16);
+      tx.offset += 2;
+
+      input.script = "";
+
+      if (0 === input.scriptSize) {
+        // "Raw" Tx
+      } else if (25 === input.scriptSize) {
+        // "Hashable" Tx
+        tx.hasInputScript = true;
+
+        input.script = hex.substr(tx.offset, 2 * input.scriptSize);
+        tx.offset += 2 * input.scriptSize;
+      } else if (input.scriptSize >= 106 && input.scriptSize <= 109) {
+        let sig = {
+          sigHashTypeHex: "",
+          sigHashType: 0,
+          publicKeySizeHex: "",
+          publicKeySize: 0,
+          publicKey: "",
+          signature: "",
+          sigSizeHex: "",
+          sigSize: 0,
+          asn1Seq: "",
+          asn1Bytes: "",
+          rTypeHex: "",
+          rSizeHex: "",
+          rSize: 0,
+          rValue: "",
+          sTypeHex: "",
+          sSizeHex: "",
+          sSize: 0,
+          sValue: "",
+        };
+
+        // "Signed" Tx
+        tx.hasInputScript = true;
+
+        sig.signature = hex.substr(tx.offset, 2 * input.scriptSize);
+        tx.offset += 2 * input.scriptSize;
+
+        sig.sigSizeHex = sig.signature.substr(0, 2);
+        sig.sigSize = parseInt(sig.sigSizeHex, 16);
+        sig.asn1Seq = sig.signature.substr(2, 2);
+        sig.asn1Bytes = sig.signature.substr(4, 2);
+
+        sig.rTypeHex = sig.signature.substr(6, 2);
+        sig.rSizeHex = sig.signature.substr(8, 2);
+        sig.rSize = parseInt(sig.rSizeHex, 16);
+
+        let sIndex = 10;
+        sig.rValue = sig.signature
+          .substr(sIndex, 2 * sig.rSize)
+          .padStart(66, " ");
+        sIndex += 2 * sig.rSize;
+        sig.sTypeHex = sig.signature.substr(sIndex, 2);
+        sIndex += 2;
+        sig.sSizeHex = sig.signature.substr(sIndex, 2);
+        sig.sSize = parseInt(sig.sSizeHex, 16);
+        sIndex += 2;
+        sig.sValue = sig.signature
+          .substr(sIndex, 2 * sig.sSize)
+          .padStart(66, " ");
+        sIndex += 2 * sig.sSize;
+
+        sig.sigHashTypeHex = sig.signature.substr(sIndex, 2);
+        sig.sigHashType = parseInt(sig.sigHashTypeHex, 16);
+        sIndex += 2;
+
+        sig.publicKeySizeHex = sig.signature.substr(sIndex, 2);
+        sig.publicKeySize = parseInt(sig.publicKeySizeHex, 16);
+        sIndex += 2;
+
+        sig.publicKey = sig.signature.substr(sIndex, 2 * sig.publicKeySize);
+        sIndex += 2 * sig.publicKeySize;
+
+        Object.assign(input, sig);
+        let rest = sig.signature.substr(sIndex);
+        if (rest) {
+          Object.assign(input, { extra: rest });
+        }
+      } else {
+        throw new Error(
+          `expected a "script" size of 0 (raw), 25 (hashable), or 106-109 (signed), but got '${input.scriptSize}'`,
+        );
+      }
+
+      input.sequence = hex.substr(tx.offset, 8);
+      tx.offset += 8;
+    }
+
+    let [numOutputs, numOutputsSize] = TxUtils._parseVarIntHex(hex, tx.offset);
+    tx.offset += numOutputsSize;
+    tx.numOutputsHex = numOutputs.toString(16);
+    tx.numOutputsHex = tx.numOutputsHex.padStart(2, "0");
+    tx.numOutputs = numOutputs;
+
+    tx.outputs = [];
+    for (let i = 0; i < tx.numOutputs; i += 1) {
+      let output = {};
+      tx.outputs.push(output);
+
+      output.satoshisHex = hex.substr(tx.offset, 16);
+      tx.offset += 16;
+      let satsHex = Tx.utils.reverseHex(output.satoshisHex);
+      output.satoshis = parseInt(satsHex, 16);
+      tx.totalSatoshis += output.satoshis;
+
+      // TODO VarInt
+      output.lockScriptSizeHex = hex.substr(tx.offset, 2);
+      output.lockScriptSize = parseInt(output.lockScriptSizeHex, 16);
+      tx.offset += 2;
+
+      output.script = hex.substr(tx.offset, 2 * output.lockScriptSize);
+      tx.offset += 2 * output.lockScriptSize;
+
+      output.scriptTypeHex = output.script.slice(0, 2);
+      output.scriptType = parseInt(output.scriptTypeHex, 16);
+      output.pubKeyHash = "";
+      output.memo = "";
+      output.message = "";
+      if (output.scriptTypeHex === OP_RETURN) {
+        output.memo = output.script.slice(4, 2 * output.lockScriptSize);
+        output.message = "";
+        let decoder = new TextDecoder();
+        let bytes = Tx.utils.hexToBytes(output.memo);
+        try {
+          output.message = decoder.decode(bytes);
+        } catch (e) {
+          output.message = "<non-UTF-8 bytes>";
+        }
+      } else {
+        // TODO check the script type
+        output.pubKeyHash = output.script.slice(6, -4);
+      }
+    }
+
+    tx.locktimeHex = hex.substr(tx.offset, 8);
+    let locktimeHexRev = Tx.utils.reverseHex(tx.locktimeHex);
+    tx.locktime = parseInt(locktimeHexRev, 16);
+    tx.offset += 8;
+
+    tx.sigHashTypeHex = hex.substr(tx.offset);
+    if (tx.sigHashTypeHex) {
+      tx.sigHashType = parseInt(tx.sigHashTypeHex.slice(0, 2));
+      hex = hex.slice(0, -8);
+    }
+
+    tx.size = hex.length / 2;
+    tx.cost = tx.size + tx.totalSatoshis;
+
+    tx.transaction = hex;
+    return tx;
+  };
+
+  /**
+   * @param {String} hex
+   * @param {Number} offset
+   */
+  TxUtils._parseVarIntHex = function (hex, offset) {
+    let size = 2;
+    let numHex = hex.substr(offset, 2);
+    let num = parseInt(numHex, 16);
+    offset += size;
+
+    if (num > 252) {
+      if (253 === num) {
+        numHex = hex.substr(offset, 4);
+      } else if (254 === num) {
+        numHex = hex.substr(offset, 8);
+      } else if (255 === num) {
+        numHex = hex.substr(offset, 16);
+      }
+      num = parseInt(numHex, 16);
+      size += numHex.length;
+    }
+
+    return [num, size];
   };
 
   // TODO Tx.utils.sha256sha256(txHex, inputs, sigHashType)
@@ -1609,9 +1862,10 @@ if ("object" === typeof module) {
 // Type Aliases
 
 /** @typedef {Number} Float64 */
-/** @typedef {Number} Uint53 */
-/** @typedef {Number} Uint32 */
 /** @typedef {Number} Uint8 */
+/** @typedef {Number} Uint32 */
+/** @typedef {Number} Uint53 */
+/** @typedef {String} Hex */
 /** @typedef {Uint8Array} TxPrivateKey */
 /** @typedef {Uint8Array} TxPublicKey */
 /** @typedef {Uint8Array} TxSignature */
@@ -1876,6 +2130,30 @@ if ("object" === typeof module) {
  * @param {Array<TxOutput>} outputs
  * @param {TxOutput} changeOutput - object with 0 satoshis and change address, pubKeyHash, or script
  * @returns {Promise<TxInfo>}
+ */
+
+/**
+ * @callback TxParseRequest
+ * @param {Hex} hex - a tx request with unsigned or partially signed inputs
+ * @returns {TxInfo}
+ */
+
+/**
+ * @callback TxParseHashable
+ * @param {Hex} hex - a ready-to-sign tx with input script and trailing sighash byte
+ * @returns {TxInfo}
+ */
+
+/**
+ * @callback TxParseSigned
+ * @param {Hex} hex - a fully signed, ready-to-broadcast transaction
+ * @returns {TxInfo}
+ */
+
+/**
+ * @callback TxParseUnknown
+ * @param {Hex} hex - a tx request, hashable tx, or signed tx
+ * @returns {TxInfo}
  */
 
 /**

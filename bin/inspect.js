@@ -2,276 +2,220 @@
 
 "use strict";
 
-let Fs = require("node:fs");
+let Fs = require("node:fs/promises");
 
-let Tx = require("../dashtx.js");
+let DashTx = require("../dashtx.js");
 
-let filepath = process.argv[2];
-
-const OP_RETURN = 0x6a; // 106
-
-async function main() {
-  /* jshint maxstatements: 200 */
-  let hasInputScript = false;
-  let totalUnits = 0;
-
-  let hex = Fs.readFileSync(filepath, "utf8");
-  hex = hex.trim();
-
-  let next = 0;
-  let versionHex = hex.substr(next, 8);
-  // TODO reverse
-  let version = parseInt(versionHex.substr(0, 2), 16);
-  next += 8;
-  console.info();
-  console.info();
-  console.info(`${versionHex}                  # VERSION (${version})`);
-
-  let numInputsHex = hex.substr(next, 2);
-  let numInputs = parseInt(numInputsHex, 16);
-  next += 2;
-
-  if (numInputs > 252) {
-    if (253 === numInputs) {
-      numInputsHex += hex.substr(next, 4);
-    } else if (254 === numInputs) {
-      numInputsHex += hex.substr(next, 8);
-    } else if (255 === numInputs) {
-      numInputsHex += hex.substr(next, 16);
-    }
-    numInputs = parseInt(numInputsHex, 16);
-    next += numInputsHex.length - 2;
+/**
+ * @param {Object<String, any>} tx
+ */
+DashTx._debugPrint = async function (tx) {
+  // version
+  let lines = [""];
+  if (tx.error) {
+    lines.push(`                          # parsed to ${tx.offset}`);
   }
-  console.info(
-    `${numInputsHex}                        # Inputs (${numInputs})`,
+  lines.push(`${tx.versionHex}                  # VERSION (${tx.version})`);
+  lines.push("");
+
+  // inputs
+  lines.push(
+    `${tx.numInputsHex}                        # Inputs (${tx.numInputs})`,
   );
-
-  for (let i = 0; i < numInputs; i += 1) {
+  for (let i = 0; i < tx.inputs?.length; i += 1) {
     let count = i + 1;
-    console.info();
-    console.info(`# Input ${count} of ${numInputs}`);
-    let txId = hex.substr(next, 64);
-    next += 64;
-    console.info("   ", txId.slice(0, 16), "     # Previous Output TX ID");
-    console.info("   ", txId.slice(16, 32));
-    console.info("   ", txId.slice(32, 48));
-    console.info("   ", txId.slice(48, 64));
+    let input = tx.inputs[i];
+    lines.push("");
+    lines.push(`# Input ${count} of ${tx.numInputs}`);
 
-    let outputIndexHex = hex.substr(next, 8);
-    let outputIndex = parseInt(outputIndexHex.slice(0, 2));
-    console.info(
-      `    ${outputIndexHex}              # Previous Output index (${outputIndex})`,
+    let txid1 = input.txidHex.slice(0, 16);
+    let txid2 = input.txidHex.slice(16, 32);
+    let txid3 = input.txidHex.slice(32, 48);
+    let txid4 = input.txidHex.slice(48, 64);
+    lines.push(`    ${txid1}      # Previous Output TX ID`);
+    lines.push(`    ${txid2}`);
+    lines.push(`    ${txid3}`);
+    lines.push(`    ${txid4}`);
+
+    lines.push(
+      `    ${input.outputIndexHex}              # Previous Output index (${input.outputIndex})`,
     );
-    next += 8;
 
-    // TODO VarInt
-    let scriptSizeHex = hex.substr(next, 2);
-    let scriptSize = parseInt(scriptSizeHex, 16);
-    console.info(
-      `    ${scriptSizeHex}                    # Script Size (${scriptSize} bytes)`,
+    lines.push(
+      `    ${input.scriptSizeHex}                    # Script Size (${input.scriptSize} bytes)`,
     );
-    next += 2;
 
-    if (0 === scriptSize) {
-      // "Raw" Tx
-    } else if (25 === scriptSize) {
-      // "Hashable" Tx
-      hasInputScript = true;
-
-      let script = hex.substr(next, 2 * scriptSize);
-      next += 2 * scriptSize;
-
-      console.info(
-        "   ",
-        script.slice(0, 4),
-        "                 # (Hashable) Lock Script",
-      );
-      console.info("   ", script.slice(4, 6));
-      console.info("   ", script.slice(6, 26));
-      console.info("   ", script.slice(26, 46));
-      console.info("   ", script.slice(46, 50));
-    } else if (scriptSize >= 106 && scriptSize <= 109) {
-      hasInputScript = true;
-
-      let script = hex.substr(next, 2 * scriptSize);
-      next += 2 * scriptSize;
-
-      let sigSizeHex = script.substr(0, 2);
-      let sigSize = parseInt(sigSizeHex, 16);
-      console.info(
-        `    ${sigSizeHex}                    # Signature Script Size (${sigSize})`,
+    if (25 === input.scriptSize) {
+      // ex: 76 a9 14 37b00a500178dfb1bb95d66fe7ba10d9baf9d14e 88 ac
+      let opCodes1 = input.script.slice(0, 4);
+      let pkhLen = input.script.slice(4, 6);
+      let pkh1 = input.script.slice(6, 26);
+      let pkh2 = input.script.slice(26, 46);
+      let opCodes2 = input.script.slice(46, 50);
+      lines.push(`    ${opCodes1}                  # (Hashable) Lock Script`);
+      lines.push(`    ${pkhLen}`);
+      lines.push(`    ${pkh1}`);
+      lines.push(`    ${pkh2}`);
+      lines.push(`    ${opCodes2}`);
+    } else if (input.signature) {
+      lines.push(
+        `    ${input.sigSizeHex}                    # Signature Script Size (${input.sigSize})`,
       );
 
-      let asn1Seq = script.substr(2, 2);
-      let asn1Bytes = script.substr(4, 2);
-      console.info(
-        `    ${asn1Seq}${asn1Bytes}                  # ASN.1 ECDSA Signature`,
+      lines.push(
+        `    ${input.asn1Seq}${input.asn1Bytes}                  # ASN.1 ECDSA Signature`,
       );
 
-      let rTypeHex = script.substr(6, 2);
-      let rSizeHex = script.substr(8, 2);
-      let rSize = parseInt(rSizeHex, 16);
-      console.info(`    ${rTypeHex}${rSizeHex}`);
+      lines.push(`    ${input.rTypeHex}${input.rSizeHex}`);
 
-      let sIndex = 10;
-      let rValue = script.substr(sIndex, 2 * rSize).padStart(66, " ");
-      sIndex += 2 * rSize;
-      console.info(`    ${rValue}`);
+      lines.push(`    ${input.rValue}`);
 
-      let sTypeHex = script.substr(sIndex, 2);
-      sIndex += 2;
+      lines.push(`    ${input.sTypeHex}${input.sSizeHex}`);
 
-      let sSizeHex = script.substr(sIndex, 2);
-      let sSize = parseInt(sSizeHex, 16);
-      sIndex += 2;
-      console.info(`    ${sTypeHex}${sSizeHex}`);
+      lines.push(`    ${input.sValue}`);
 
-      let sValue = script.substr(sIndex, 2 * sSize).padStart(66, " ");
-      sIndex += 2 * sSize;
-      console.info(`    ${sValue}`);
-
-      let sigHashTypeHex = script.substr(sIndex, 2);
-      let sigHashType = parseInt(sigHashTypeHex, 16);
-      sIndex += 2;
-      console.info(
-        `    ${sigHashTypeHex}                    # Sig Hash Type (${sigHashType})`,
+      lines.push(
+        `    ${input.sigHashTypeHex}                    # Sig Hash Type (${input.sigHashType})`,
       );
 
-      let publicKeySizeHex = script.substr(sIndex, 2);
-      let publicKeySize = parseInt(publicKeySizeHex, 16);
-      sIndex += 2;
-      console.info(
-        `    ${publicKeySizeHex}                    # Public Key Size (${publicKeySize})`,
+      lines.push(
+        `    ${input.publicKeySizeHex}                    # Public Key Size (${input.publicKeySize})`,
       );
 
-      let publicKeyHex = script.substr(sIndex, 2 * publicKeySize);
-      sIndex += 2 * publicKeySize;
-      console.info(`    ${publicKeyHex}`);
+      lines.push(`    ${input.publicKey}`);
 
-      let rest = script.substr(sIndex);
-      if (rest) {
-        console.error("spurious extra in script???");
-        console.error(rest);
+      if (input.extra) {
+        lines.push("WARN: spurious extra in input script???");
+        lines.push(`      ${input.extra}`);
       }
-
-      // "Signed" Tx
     } else {
-      throw new Error(
-        `expected a "script" size of 0 (raw), 25 (hashable), or 106-109 (signed), but got '${scriptSize}'`,
-      );
+      console.warn(`WARN: no display for this type of script: ${input.script}`);
     }
 
-    let sequence = hex.substr(next, 8);
-    next += 8;
-    console.info(`    ${sequence}              # Sequence (always 0xffffffff)`);
+    lines.push(
+      `    ${input.sequence}              # Sequence (always 0xffffffff)`,
+    );
   }
 
-  let numOutputsHex = hex.substr(next, 2);
-  // TODO varint
-  let numOutputs = parseInt(numOutputsHex, 16);
-  next += 2;
-  console.info();
-  console.info(
-    `${numOutputsHex}                        # Outputs (${numOutputs})`,
+  // outputs
+  lines.push("");
+  lines.push(
+    `${tx.numOutputsHex}                        # Outputs (${tx.numOutputs})`,
   );
-
-  for (let i = 0; i < numOutputs; i += 1) {
+  for (let i = 0; i < tx.outputs?.length; i += 1) {
     let count = i + 1;
-    console.info(`# Output ${count} of ${numOutputs}`);
+    let output = tx.outputs[i];
 
-    let unitsHexReverse = hex.substr(next, 16);
-    next += 16;
-    let unitsHex = Tx.utils.reverseHex(unitsHexReverse);
-    let units = parseInt(unitsHex, 16);
-    totalUnits += units;
+    lines.push("");
+    lines.push(`# Output ${count} of ${tx.numOutputs}`);
 
-    console.info(
-      `    ${unitsHexReverse}      # Base Units (satoshis) (${units})`,
+    lines.push(
+      `    ${output.satoshisHex}      # Satoshis (base units) (${output.satoshis})`,
     );
 
-    // TODO VarInt
-    let lockScriptSizeHex = hex.substr(next, 2);
-    let lockScriptSize = parseInt(lockScriptSizeHex, 16);
-    console.info(
-      `    ${lockScriptSizeHex}                    # Lock Script Size (${lockScriptSize} bytes)`,
+    lines.push(
+      `    ${output.lockScriptSizeHex}                    # Lock Script Size (${output.lockScriptSize} bytes)`,
     );
-    next += 2;
 
-    let script = hex.substr(next, 2 * lockScriptSize);
-    next += 2 * lockScriptSize;
-
-    let scriptTypeHex = script.slice(0, 2);
-    let scriptType = parseInt(scriptTypeHex, 16);
-    if (OP_RETURN === scriptType) {
-      console.info(
-        "   ",
-        scriptTypeHex,
-        script.slice(2, 4),
-        "                # Memo (OP_RETURN)",
+    //@ts-ignore - ._OP_RETURN_HEX exists for debugging
+    if (output.scriptTypeHex === DashTx._OP_RETURN_HEX) {
+      let todoWhatItIs = output.script.slice(2, 4);
+      lines.push(
+        `    ${output.scriptTypeHex} ${todoWhatItIs}                 # Memo (OP_RETURN)`,
       );
-      let memo = script.slice(4, 2 * lockScriptSize);
-      let decoder = new TextDecoder();
-      let bytes = Tx.utils.hexToBytes(memo);
-      let msg = "";
-      try {
-        msg = decoder.decode(bytes);
-      } catch (e) {
-        msg = memo;
-      }
-      let chars = msg.split("");
+      let chars = output.message.split("");
       for (; chars.length; ) {
         let part = chars.splice(0, 20);
         let str = part.join("");
-        console.info("   ", str);
+        lines.push(`    ${str}`);
       }
     } else {
-      console.info("   ", script.slice(0, 4), "                 # Script");
-      console.info("   ", script.slice(4, 6));
-      console.info("   ", script.slice(6, 26));
-      console.info("   ", script.slice(26, 46));
-      console.info("   ", script.slice(46, 50));
+      let script1 = output.script.slice(0, 4);
+      let script2 = output.script.slice(4, 6);
+      let script3 = output.script.slice(6, 26);
+      let script4 = output.script.slice(26, 46);
+      let script5 = output.script.slice(46, 50);
+      lines.push(`    ${script1}                  # Script`);
+      lines.push(`    ${script2}`);
+      lines.push(`    ${script3}`);
+      lines.push(`    ${script4}`);
+      lines.push(`    ${script5}`);
     }
-    console.info();
+    lines.push("");
   }
 
-  // TODO reverse
-  let locktimeHex = hex.substr(next, 8);
-  let locktime = parseInt(locktimeHex.slice(0, 2));
-  next += 8;
-  console.info(`${locktimeHex}                  # LOCKTIME (${locktime})`);
-  console.info();
-
-  let sigHashTypeHex = hex.substr(next);
-  if (sigHashTypeHex) {
-    let sigHashType = parseInt(sigHashTypeHex.slice(0, 2));
-    hex = hex.slice(0, -8);
-    console.info(
-      `${sigHashTypeHex}                  # SIGHASH_TYPE (0x${sigHashType})`,
+  lines.push(`${tx.locktimeHex}                  # LOCKTIME (${tx.locktime})`);
+  lines.push("");
+  if (tx.sigHashTypeHex) {
+    lines.push(
+      `${tx.sigHashTypeHex}                  # SIGHASH_TYPE (0x${tx.sigHashType})`,
     );
-    console.info();
+    lines.push("");
 
-    let txHash = await Tx.hashPartial(hex, Tx.SIGHASH_ALL);
-    let txHashHex = Tx.utils.bytesToHex(txHash);
+    let txHash = await DashTx.hashPartial(tx.transaction, DashTx.SIGHASH_ALL);
+    let txHashHex = DashTx.utils.bytesToHex(txHash);
     // TODO 'N/A' if not applicable
-    console.info(`Tx Hash: ${txHashHex}`);
-    console.info(`TxID:   N/A`);
-  } else if (hasInputScript) {
-    console.info(`Tx Hash: N/A`);
-    let txId = await Tx.getId(hex);
-    console.info(`TxID: ${txId}`);
+    lines.push(`Tx Hash: ${txHashHex}`);
+    // lines.push(
+    //   `Tx Hash: 'await Tx.hashPartial(txInfo.transaction, DashTx.SIGHASH_ALL)'`,
+    // );
+    lines.push(`TxID:   N/A`);
+  } else if (tx.hasInputScript) {
+    lines.push(`Tx Hash: N/A`);
+    let txId = await DashTx.getId(tx.transaction);
+    lines.push(`TxID: ${txId}`);
+    // lines.push(`TxID: 'await Tx.getId(txInfo.transaction)'`);
   } else {
-    console.info(`Tx Hash: N/A`);
-    console.info(`TxID:   N/A`);
+    lines.push(`Tx Hash: N/A`);
+    lines.push(`TxID:   N/A`);
   }
 
-  let txBytes = hex.length / 2;
-  console.info(`Tx Bytes:       ${txBytes}`);
-  console.info();
-  console.info(`Tx Outputs:     ${totalUnits}`);
-  console.info(`Tx Fee:         ${txBytes}`);
-  let txCost = txBytes + totalUnits;
-  console.info(`Tx Min Cost:    ${txCost}`);
-  console.info();
+  lines.push(`Tx Bytes:       ${tx.size}`);
+  lines.push("");
+  lines.push(`Tx Outputs:     ${tx.totalSatoshis}`);
+  lines.push(`Tx Fee:         ${tx.size}`);
+  lines.push(`Tx Min Cost:    ${tx.cost}`);
+  lines.push("");
+  if (!tx.error) {
+    lines.push(`                          # parsed to completion seccussfully`);
+  }
+
+  let output = lines.join("\n");
+  return output;
+};
+
+async function main() {
+  let args = process.argv.slice(2);
+  let jsonIndex = args.indexOf("--json");
+  if (jsonIndex > -1) {
+    args.splice(jsonIndex, 1);
+  }
+
+  let filepath = args.pop() || "you-must-specify-a-file-path";
+  let hex = await Fs.readFile(filepath, "utf8");
+  // nix comments and whitespace used for debugging
+  hex = hex.replace(/(^|\s)#.*/g, " ");
+  hex = hex.replace(/[\s\n]+/g, "");
+
+  let txInfo;
+  try {
+    txInfo = DashTx.parseUnknown(hex);
+  } catch (e) {
+    //@ts-ignore
+    console.error(e.transaction);
+    //@ts-ignore
+    e.transaction.error = e.stack;
+    throw e;
+  }
+
+  if (jsonIndex > -1) {
+    console.info(txInfo);
+    return;
+  }
+
+  let out = await DashTx._debugPrint(txInfo);
+  console.info(`Use --json for JSON output`);
+  console.info(out);
 }
 
 main()
