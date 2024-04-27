@@ -370,7 +370,7 @@ var DashTx = ("object" === typeof module && exports) || {};
             `signable input must have either 'pubKeyHash' or 'script'`,
           );
         }
-        lockScript = `${PKH_SCRIPT_SIZE}${OP_DUP}${OP_HASH160}${PKH_SIZE}${input.pubKeyHash}${OP_EQUALVERIFY}${OP_CHECKSIG}`;
+        lockScript = `${OP_DUP}${OP_HASH160}${PKH_SIZE}${input.pubKeyHash}${OP_EQUALVERIFY}${OP_CHECKSIG}`;
       }
       return {
         txId: input.txId,
@@ -517,7 +517,8 @@ var DashTx = ("object" === typeof module && exports) || {};
         output.pubKeyHash = Tx.utils.addrToPubKeyHash(output.address);
       }
       assertHex(output.pubKeyHash, `output[${i}].pubKeyHash`);
-      let lockScript = `${PKH_SCRIPT_SIZE}${OP_DUP}${OP_HASH160}${PKH_SIZE}${output.pubKeyHash}${OP_EQUALVERIFY}${OP_CHECKSIG}`;
+      tx.push(PKH_SCRIPT_SIZE);
+      let lockScript = `${OP_DUP}${OP_HASH160}${PKH_SIZE}${output.pubKeyHash}${OP_EQUALVERIFY}${OP_CHECKSIG}`;
       tx.push(lockScript);
     });
 
@@ -537,7 +538,8 @@ var DashTx = ("object" === typeof module && exports) || {};
       let lockScriptSize = memoSize + 2;
       let lockScriptSizeHex = TxUtils.toVarInt(lockScriptSize);
       let memoSizeHex = TxUtils.toVarInt(memoSize);
-      let lockScript = `${lockScriptSizeHex}${OP_RETURN}${memoSizeHex}${memoHex}`;
+      tx.push(lockScriptSizeHex);
+      let lockScript = `${OP_RETURN}${memoSizeHex}${memoHex}`;
       tx.push(lockScript);
     }
 
