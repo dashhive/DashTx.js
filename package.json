@@ -48,7 +48,7 @@
   "devDependencies": {
     "@dashincubator/secp256k1": "^1.7.1-5",
     "@types/node": "^20.12.7",
-    "dashkeys": "^1.1.0",
+    "dashkeys": "^1.1.2",
     "zora": "^5.2.0"
   }
 }
