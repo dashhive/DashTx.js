@@ -34,5 +34,4 @@ module.exports = require("./dashtx.js");
  * @typedef {import('./dashtx.js').TxInputSigned} TxInputSigned
  * @typedef {import('./dashtx.js').TxOutput} TxOutput
  * @typedef {import('./dashtx.js').TxOutputSortable} TxOutputSortable
- * @typedef {import('./dashtx.js').TxSignOptions} TxSignOptions
  */
