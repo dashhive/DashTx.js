@@ -11,13 +11,6 @@ let DashTx = require("../");
 let DashKeys = require("dashkeys");
 let Secp256k1 = require("@dashincubator/secp256k1");
 
-/** @type {import('../dashtx.js').TxSign} */
-async function signTx(privKeyBytes, hashBytes) {
-  let sigOpts = { canonical: true };
-  let sigBuf = await Secp256k1.sign(hashBytes, privKeyBytes, sigOpts);
-  return sigBuf;
-}
-
 async function main() {
   let args = process.argv.slice(2);
 
@@ -77,7 +70,6 @@ async function main() {
   let dash = toDash(coreUtxo.satoshis);
   console.info(`Coin Value:  ${dash} (${duffs})`);
 
-  let keys = [privKeyBytes];
   let inputs = [coreUtxo];
   let outputs = [{ memo: memo, satoshis: 0 }];
 
@@ -106,11 +98,29 @@ async function main() {
   //change.satoshis = sats;
 
   let dashTx = DashTx.create({
-    sign: signTx,
+    /** @type {import('../dashtx.js').TxSign} */
+    sign: async function (privKeyBytes, hashBytes) {
+      let sigOpts = { canonical: true };
+      let sigBuf = await Secp256k1.sign(hashBytes, privKeyBytes, sigOpts);
+      return sigBuf;
+    },
+    getPrivateKey: async function () {
+      return privKeyBytes;
+    },
+    toPublicKey:
+      /**
+       * @param {Uint8Array} privBytes
+       * @returns {Promise<Uint8Array>}
+       */
+      async function (privBytes) {
+        let isCompressed = true;
+        let pubBytes = Secp256k1.getPublicKey(privBytes, isCompressed);
+        return pubBytes;
+      },
   });
 
   //@ts-ignore
-  let txInfoSigned = await dashTx.hashAndSignAll(txInfo, keys);
+  let txInfoSigned = await dashTx.hashAndSignAll(txInfo);
   let txHex = txInfoSigned.transaction.toString();
 
   console.info();

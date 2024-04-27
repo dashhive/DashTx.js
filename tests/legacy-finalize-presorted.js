@@ -5,20 +5,6 @@ let DashTx = require("../");
 let DashKeys = require("dashkeys");
 let Secp256k1 = require("@dashincubator/secp256k1");
 
-let keyUtils = {
-  sign: async function (privKeyBytes, hashBytes) {
-    let sigOpts = {
-      canonical: true,
-      extraEntropy: true,
-    };
-    let sigBuf = await Secp256k1.sign(hashBytes, privKeyBytes, sigOpts);
-    return sigBuf;
-  },
-  toPublicKey: async function (privKeyBytes) {
-    return DashKeys.utils.toPublicKey(privKeyBytes);
-  },
-};
-
 // generated with https://webinstall.dev/dashmsg
 // dashmsg gen --cointype '4c' ./test-1.wif
 // dashmsg inspect --cointype '4c' "$(cat ./test-1.wif)"
@@ -90,7 +76,31 @@ function genTestVals(name, sats, deterministic) {
 
 async function testAll() {
   async function setupAndRunOne(original) {
+    let keyUtils = {
+      sign: async function (privKeyBytes, hashBytes) {
+        let sigOpts = {
+          canonical: true,
+          extraEntropy: true,
+        };
+        let sigBuf = await Secp256k1.sign(hashBytes, privKeyBytes, sigOpts);
+        return sigBuf;
+      },
+      toPublicKey: async function (privKeyBytes) {
+        return DashKeys.utils.toPublicKey(privKeyBytes);
+      },
+      getPrivateKey: async function (txInput) {
+        let wif = original.wifs[txInput.address];
+        if (!wif) {
+          let msg = `no WIF found for pubKeyAddr '${txInput.address}' (${txInput.satoshis})`;
+          throw new Error(msg);
+        }
+
+        let privKeyBytes = await DashKeys.wifToPrivKey(wif);
+        return privKeyBytes;
+      },
+    };
     let dashTx = DashTx.create(keyUtils);
+
     let t1 = JSON.parse(JSON.stringify(original));
     let t2 = JSON.parse(JSON.stringify(original));
     let txDraft = dashTx.legacy.draftSingleOutput({
@@ -101,18 +111,9 @@ async function testAll() {
     txDraft.inputs.sort(DashTx.sortInputs);
     txDraft.outputs.sort(DashTx.sortOutputs);
 
-    let keys = [];
     for (let input of txDraft.inputs) {
       let pkhBytes = await DashKeys.addrToPkh(input.address);
       input.pubKeyHash = DashKeys.utils.bytesToHex(pkhBytes);
-
-      let wif = t1.wifs[input.address];
-      let key = await DashKeys.wifToPrivKey(wif);
-      if (!key) {
-        let msg = `no WIF found for pubKeyAddr '${input.address}' (${input.satoshis})`;
-        throw new Error(msg);
-      }
-      keys.push(key);
     }
 
     for (let output of txDraft.outputs) {
@@ -128,7 +129,7 @@ async function testAll() {
     }
     let myDashTx = DashTx.create(_keyUtils);
 
-    await testOne(myDashTx, t2, txDraft, keys, rndIters).catch(function (err) {
+    await testOne(myDashTx, t2, txDraft, rndIters).catch(function (err) {
       console.info(`# failed ${t1.name}`);
       console.info(`# txDraft`, txDraft);
       if (err.txSummary) {
@@ -162,12 +163,12 @@ function createNonRndSigner() {
   return nonRndSign;
 }
 
-async function testOne(myDashTx, original, txDraft, keys, rndIters) {
+async function testOne(myDashTx, original, txDraft, rndIters) {
   for (let seedIterations = 0; seedIterations < rndIters; seedIterations += 1) {
     let t = JSON.parse(JSON.stringify(original));
     let exp = t.expected;
 
-    let txSummary = await myDashTx.legacy.finalizePresorted(txDraft, keys);
+    let txSummary = await myDashTx.legacy.finalizePresorted(txDraft);
     let txByteSize = txSummary.transaction.length / 2;
     // console.log("[DEBUG] txSummary");
     // console.log(txByteSize, txSummary.fee);

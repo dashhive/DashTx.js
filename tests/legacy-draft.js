@@ -2,6 +2,8 @@
 
 let DashTx = require("../");
 
+let Secp256k1 = require("@dashincubator/secp256k1");
+
 // generated with https://webinstall.dev/dashmsg
 // dashmsg gen --cointype '4c' ./test-1.wif
 // dashmsg inspect --cointype '4c' "$(cat ./test-1.wif)"
@@ -43,7 +45,30 @@ let tests = [
 ];
 
 async function test() {
-  let dashTx = DashTx.create();
+  let keyUtils = {
+    getPrivateKey: async function (txInput, i) {
+      let pkhBytes = DashKeys.utils.hexToBytes(txInput.pubKeyHash);
+      let address = await DashKeys.pkhToAddr(txInput.pubKeyHash);
+
+      let yourKeyData = yourWalletKeyMapGoesHere[address];
+
+      let privKeyBytes = DashKeys.wifToPrivKey(yourKeyData.wif);
+      return privKeyBytes;
+    },
+    sign: async function (privKeyBytes, txHashBytes) {
+      let sigOpts = { canonical: true, extraEntropy: true };
+      let sigBytes = await Secp256k1.sign(txHashBytes, privKeyBytes, sigOpts);
+
+      return sigBytes;
+    },
+    toPublicKey: async function (privKeyBytes) {
+      let isCompressed = true;
+      let pubKeyBytes = Secp256k1.getPublicKey(privKeyBytes, isCompressed);
+
+      return pubKeyBytes;
+    },
+  };
+  let dashTx = DashTx.create(keyUtils);
 
   for (let t of tests) {
     let exp = t.expected;

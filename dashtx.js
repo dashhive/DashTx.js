@@ -241,16 +241,9 @@ var DashTx = ("object" === typeof module && exports) || {};
     let txInst = {};
 
     /** @type {TxHashAndSignAll} */
-    txInst.hashAndSignAll = async function (txInfo, keys) {
+    txInst.hashAndSignAll = async function (txInfo) {
       let privUtils = keyUtils;
-      if (keys) {
-        if (keys.length !== txInfo.inputs.length) {
-          let msg = `the number and order of 'keys' must match number of 'inputs' - each 'utxo' of the provided private key must be matched to that private key`;
-          throw new Error(msg);
-        }
-        privUtils = Object.assign({}, keyUtils);
-      }
-      void Tx._addPrivKeyUtils(privUtils, keys);
+      void Tx._addPrivKeyUtils(privUtils);
 
       return await Tx._hashAndSignAll(txInfo, privUtils);
     };
@@ -333,19 +326,18 @@ var DashTx = ("object" === typeof module && exports) || {};
 
     /**
      * @param {TxDraft} txDraft
-     * @param {Array<TxPrivateKey>} keys
      * @returns {Promise<TxSummary>}
      */
-    txInst.legacy.finalizePresorted = async function (txDraft, keys) {
+    txInst.legacy.finalizePresorted = async function (txDraft) {
       /** @type {TxInfoSigned} */
       let txSigned = await txInst.legacy
-        ._signToTarget(txDraft, keys)
+        ._signToTarget(txDraft)
         .catch(async function (e) {
           if ("E_NO_ENTROPY" !== e.code) {
             throw e;
           }
 
-          let _txSigned = await txInst.legacy._signFeeWalk(txDraft, keys);
+          let _txSigned = await txInst.legacy._signFeeWalk(txDraft);
           return _txSigned;
         });
 
@@ -355,10 +347,9 @@ var DashTx = ("object" === typeof module && exports) || {};
 
     /**
      * @param {TxDraft} txDraft
-     * @param {Array<Uint8Array>} keys
      * @returns {Promise<TxInfoSigned>}
      */
-    txInst.legacy._signToTarget = async function (txDraft, keys) {
+    txInst.legacy._signToTarget = async function (txDraft) {
       let limit = 128;
       let lastTx = "";
       let hasEntropy = true;
@@ -368,7 +359,7 @@ var DashTx = ("object" === typeof module && exports) || {};
       let fee;
 
       for (let n = 0; true; n += 1) {
-        txSigned = await txInst.hashAndSignAll(txDraft, keys);
+        txSigned = await txInst.hashAndSignAll(txDraft);
 
         fee = txSigned.transaction.length / 2;
         if (fee <= txDraft.feeTarget) {
@@ -401,10 +392,9 @@ var DashTx = ("object" === typeof module && exports) || {};
      * Strategy for signing transactions when a non-entropy signing method is used -
      * exhaustively walk each possible signature until one that works is found.
      * @param {TxDraft} txDraft
-     * @param {Array<Uint8Array>} keys
      * @returns {Promise<TxInfoSigned>}
      */
-    txInst.legacy._signFeeWalk = async function (txDraft, keys) {
+    txInst.legacy._signFeeWalk = async function (txDraft) {
       //@ts-ignore - TODO should have satoshis by now
       let totalIn = DashTx.sum(txDraft.inputs);
       let totalOut = DashTx.sum(txDraft.outputs);
@@ -434,7 +424,7 @@ var DashTx = ("object" === typeof module && exports) || {};
         txDraft.outputs[outIndex].satoshis -= 1;
         totalFee += 1;
 
-        txSigned = await txInst.hashAndSignAll(txDraft, keys);
+        txSigned = await txInst.hashAndSignAll(txDraft);
 
         let byteFee = txSigned.transaction.length / 2;
         if (byteFee <= totalFee) {
@@ -745,19 +735,10 @@ var DashTx = ("object" === typeof module && exports) || {};
 
   /**
    * @param {TxDeps} privUtils
-   * @param {Array<TxPrivateKey>} keys
    */
-  Tx._addPrivKeyUtils = function (privUtils, keys) {
+  Tx._addPrivKeyUtils = function (privUtils) {
     if (!privUtils.getPrivateKey) {
-      if (!keys) {
-        throw new Error(`you must create with 'getPrivateKey()'`);
-      }
-      /** @type {TxGetPrivateKey} */
-      privUtils.getPrivateKey = async function (_, i) {
-        //@ts-ignore - keys *is* defined, see above
-        let privKey = keys[i];
-        return privKey;
-      };
+      throw new Error(`you must create with 'opts.getPrivateKey()'`);
     }
 
     if (!privUtils.getPublicKey) {
@@ -2113,7 +2094,6 @@ if ("object" === typeof module) {
 /**
  * @callback TxHashAndSignAll
  * @param {TxInfo} txInfo
- * @param {Array<TxPrivateKey>} [keys]
  */
 
 /**
