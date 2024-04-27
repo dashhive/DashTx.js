@@ -963,12 +963,16 @@ var DashTx = ("object" === typeof module && exports) || {};
 
     for (let i = 0; i < txInfo.inputs.length; i += 1) {
       let txInput = txInfo.inputs[i];
+      let privKey = await keyUtils.getPrivateKey(txInput, i, txInfo.inputs);
+      if (!privKey) {
+        continue;
+      }
+
       // TODO script -> lockScript, sigScript
       //let lockScriptHex = txInput.script;
       let _sigHashType = txInput.sigHashType ?? Tx.SIGHASH_ALL;
       let txHashable = Tx.createHashable(txInfo, i, _sigHashType);
       let txHashBuf = await Tx.hashPartial(txHashable, 0x00);
-      let privKey = await keyUtils.getPrivateKey(txInput, i, txInfo.inputs);
 
       let sigBuf = await keyUtils.sign(privKey, txHashBuf);
       let sigHex = "";
@@ -1008,7 +1012,7 @@ var DashTx = ("object" === typeof module && exports) || {};
 
       // expose _actual_ values used, for debugging
       let txHashHex = Tx.utils.bytesToHex(txHashBuf);
-      Object.assign({
+      Object.assign(txInputSigned, {
         _hash: txHashHex,
         _signature: sigHex.toString(),
         _lockScript: txInfo.inputs[i].script,
@@ -1016,14 +1020,14 @@ var DashTx = ("object" === typeof module && exports) || {};
         _sigHashType: _sigHashType,
       });
 
-      txInfoSigned.inputs[i] = txInputSigned;
+      txInfoSigned.inputs.push(txInputSigned);
     }
 
     let transaction = Tx.createSigned(txInfoSigned);
 
     return {
       //@ts-ignore - tsc doesn't support an enum here
-      inputs: txInfo.inputs,
+      inputs: txInfoSigned.inputs,
       locktime: txInfo.locktime || 0x0,
       outputs: txInfo.outputs,
       transaction: transaction,
