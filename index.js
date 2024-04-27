@@ -10,9 +10,10 @@ module.exports = require("./dashtx.js");
  * @typedef {import('./dashtx.js').TxUtils} TxUtils
  * @typedef {import('./dashtx.js').tx} tx
  * @typedef {import('./dashtx.js').Float64} Float64
- * @typedef {import('./dashtx.js').Uint53} Uint53
- * @typedef {import('./dashtx.js').Uint32} Uint32
  * @typedef {import('./dashtx.js').Uint8} Uint8
+ * @typedef {import('./dashtx.js').Uint32} Uint32
+ * @typedef {import('./dashtx.js').Uint53} Uint53
+ * @typedef {import('./dashtx.js').Hex} Hex
  * @typedef {import('./dashtx.js').TxPrivateKey} TxPrivateKey
  * @typedef {import('./dashtx.js').TxPublicKey} TxPublicKey
  * @typedef {import('./dashtx.js').TxSignature} TxSignature
