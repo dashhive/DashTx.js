@@ -627,8 +627,8 @@ var DashTx = ("object" === typeof module && exports) || {};
    * - ASC `outputIndex` (a.k.a. `output_index`, `vout`)
    */
   Tx.sortInputs = function (a, b) {
-    let aTxid = a.txid || a.txId;
-    let bTxid = b.txid || b.txId;
+    let aTxid = a.txId || a.txid;
+    let bTxid = b.txId || b.txid;
     // Ascending Lexicographical on TxId (prev-hash) in-memory (not wire) byte order
     if (aTxid > bTxid) {
       return 1;
@@ -988,8 +988,8 @@ var DashTx = ("object" === typeof module && exports) || {};
 
       /** @type TxInputSigned */
       let txInputSigned = {
-        txId: txInput.txId || txInput.txid,
         txid: txInput.txId || txInput.txid,
+        txId: txInput.txId || txInput.txid,
         outputIndex: txInput.outputIndex,
         signature: sigHex,
         publicKey: pubKeyHex,
@@ -1027,6 +1027,7 @@ var DashTx = ("object" === typeof module && exports) || {};
       return {
         //@ts-ignore - workaround for txId (insight) vs txid (dashcore rpc utxo) issue
         // (picking 'txId' over 'txid' may have been a mistake in a recent update)
+        txid: input.txId || input.txid,
         txId: input.txId || input.txid,
         outputIndex: input.outputIndex,
       };
@@ -1042,8 +1043,8 @@ var DashTx = ("object" === typeof module && exports) || {};
     txInfoHashable.inputs = txInfo.inputs.map(function (input, i) {
       if (inputIndex !== i) {
         return {
-          txId: input.txId || input.txid,
           txid: input.txId || input.txid,
+          txId: input.txId || input.txid,
           outputIndex: input.outputIndex,
         };
       }
@@ -1127,20 +1128,20 @@ var DashTx = ("object" === typeof module && exports) || {};
     for (let input of inputs) {
       let inputHex = [];
 
-      let txId = input.txId || input.txid;
-      if (!txId) {
-        throw new Error("missing required utxo property 'txId'");
+      let txid = input.txId || input.txid;
+      if (!txid) {
+        throw new Error("missing required utxo property 'txid'");
       }
 
-      if (64 !== txId.length) {
+      if (64 !== txid.length) {
         throw new Error(
-          `expected uxto property 'txId' to be a valid 64-character (32-byte) hex string, but got '${txId}' (size ${txId.length})`,
+          `expected uxto property 'txid' to be a valid 64-character (32-byte) hex string, but got '${txid}' (size ${txid.length})`,
         );
       }
 
-      assertHex(txId, "txId");
+      assertHex(txid, "txid");
 
-      let reverseTxId = Tx.utils.reverseHex(txId);
+      let reverseTxId = Tx.utils.reverseHex(txid);
       inputHex.push(reverseTxId);
 
       let voutIndex = input.outputIndex;
@@ -1619,7 +1620,8 @@ if ("object" === typeof module) {
 
 /**
  * @typedef CoreUtxo
- * @property {String} txId
+ * @property {String} [txId] - deprecated
+ * @property {String} txid
  * @property {Number} outputIndex
  * @property {String} address
  * @property {String} script
@@ -1685,7 +1687,8 @@ if ("object" === typeof module) {
 /**
  * @typedef TxInput
  * @prop {String} [address] - BaseCheck58-encoded pubKeyHash
- * @prop {String} txId - hex (not pre-reversed)
+ * @prop {String} [txId] - deprecated
+ * @prop {String} txid - hex (not pre-reversed)
  * @prop {Uint32} outputIndex - index in previous tx's output (vout index)
  * @prop {String} signature - hex-encoded ASN.1 (DER) signature (starts with 0x30440220 or  0x30440221)
  * @prop {String} [script] - the previous lock script (default: derived from public key as p2pkh)
@@ -1712,7 +1715,8 @@ if ("object" === typeof module) {
  * @typedef TxInputRaw
  * @prop {String} [address] - BaseCheck58-encoded pubKeyHash
  * @prop {Uint53} [satoshis] - for convenience
- * @prop {String} txId - hex (not pre-reversed)
+ * @prop {String} [txId] - deprecated
+ * @prop {String} txid - hex (not pre-reversed)
  * @prop {Uint32} outputIndex - index in previous tx's output (vout index)
  */
 
@@ -1720,13 +1724,15 @@ if ("object" === typeof module) {
  * @typedef TxInputUnspent
  * @prop {String} [address] - BaseCheck58-encoded pubKeyHash
  * @prop {Uint53} satoshis
- * @prop {String} txId - hex (not pre-reversed)
+ * @prop {String} [txId] - deprecated
+ * @prop {String} txid - hex (not pre-reversed)
  * @prop {Uint32} outputIndex - index in previous tx's output (vout index)
  */
 
 /**
  * @typedef TxInputSortable
- * @prop {String} txId
+ * @prop {String} [txId] - deprecated
+ * @prop {String} txid
  * @prop {Uint32} outputIndex
  */
 
@@ -1736,7 +1742,7 @@ if ("object" === typeof module) {
  */
 
 /**
- * @typedef {Pick<TxInput, "txId"|"outputIndex"|"signature"|"publicKey"|"sigHashType">} TxInputSigned
+ * @typedef {Pick<TxInput, "txId"|"txid"|"outputIndex"|"signature"|"publicKey"|"sigHashType">} TxInputSigned
  */
 
 /**
