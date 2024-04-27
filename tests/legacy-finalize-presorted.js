@@ -214,7 +214,7 @@ async function testOne(myDashTx, original, txDraft, keys, rndIters) {
 
     let hasEnough = txSummary.fee >= txByteSize;
     if (!hasEnough) {
-      console.log(JSON.stringify(txSummary, null, 2));
+      console.error(JSON.stringify(txSummary, null, 2));
       let msg = `signed transaction size is ${txByteSize}, but fee was calculated as '${txSummary.fee}'`;
       throw new Error(msg);
     }
