@@ -966,8 +966,8 @@ var DashTx = ("object" === typeof module && exports) || {};
       // TODO script -> lockScript, sigScript
       //let lockScriptHex = txInput.script;
       let _sigHashType = txInput.sigHashType ?? Tx.SIGHASH_ALL;
-      let txHashable = Tx.createHashable(txInfo, i);
-      let txHashBuf = await Tx.hashPartial(txHashable, _sigHashType);
+      let txHashable = Tx.createHashable(txInfo, i, _sigHashType);
+      let txHashBuf = await Tx.hashPartial(txHashable, 0x00);
       let privKey = await keyUtils.getPrivateKey(txInput, i, txInfo.inputs);
 
       let sigBuf = await keyUtils.sign(privKey, txHashBuf);
@@ -1047,7 +1047,7 @@ var DashTx = ("object" === typeof module && exports) || {};
     return hex;
   };
 
-  Tx.createHashable = function (txInfo, inputIndex) {
+  Tx.createHashable = function (txInfo, inputIndex, sigHashType) {
     let txInfoHashable = Object.assign({}, txInfo);
     /** @type {Array<TxInputRaw|TxInputHashable>} */
     txInfoHashable.inputs = txInfo.inputs.map(function (input, i) {
@@ -1078,8 +1078,12 @@ var DashTx = ("object" === typeof module && exports) || {};
       };
     });
 
-    let hex = Tx._create(txInfoHashable);
-    return hex;
+    let sigHashTxHex = Tx._create(txInfoHashable);
+    if (sigHashTxHex) {
+      let sigHashTypeHex = TxUtils._toUint32LE(sigHashType);
+      sigHashTxHex = `${sigHashTxHex}${sigHashTypeHex}`;
+    }
+    return sigHashTxHex;
   };
 
   Tx.createSigned = function (opts) {
@@ -2061,6 +2065,7 @@ if ("object" === typeof module) {
  * @callback TxCreateHashable
  * @param {TxInfo} txInfo
  * @param {Uint32} inputIndex - create hashable tx for this input
+ * @param {Uint32} sigHashType - 0x01 for ALL, or 0x81 for ALL + ANYONECANPAY
  * @returns {String} - hashable tx hex
  */
 
