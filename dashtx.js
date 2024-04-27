@@ -1757,7 +1757,8 @@ if ("object" === typeof module) {
 /**
  * @typedef TxInputHashable
  * @prop {String} [address] - BaseCheck58-encoded pubKeyHash
- * @prop {String} txId - hex (not pre-reversed)
+ * @prop {String} [txId] - (deprecated) see .txid
+ * @prop {String} txid - hex (not pre-reversed)
  * @prop {Uint32} outputIndex - index in previous tx's output (vout index)
  * @prop {Uint53} [satoshis] - (included for convenience as type hack)
  * @prop {String} [signature] - (included as type hack)
