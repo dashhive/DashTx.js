@@ -177,7 +177,7 @@ let keyUtils = {
 
   toPublicKey: async function (privKeyBytes) {
     let isCompressed = true;
-    let pubKeyBytes = Secp256k1.getPublicKey(privateKey, isCompressed);
+    let pubKeyBytes = Secp256k1.getPublicKey(privKeyBytes, isCompressed);
 
     return pubKeyBytes;
   },
@@ -231,9 +231,9 @@ console.info(txInfo.transaction);
 
 ```js
 // "XJREPzkMSHobz6kpxKd7reMiWr3YoyTdaj3sJXLGCmiDHaL7vmaQ"
-let privateKeyHex =
+let privKeyHex =
   "d4c569f71ea2a9be6010cb3691f2757bc9539c60fd87e8bed21d7844d7b9b246";
-let privateKey = Tx.utils.hexToBytes(privateKeyHex);
+let privKeyBytes = Tx.utils.hexToBytes(privKeyHex);
 
 let publicKeyHex =
   "03755be68d084e7ead4d83e23fb37c3076b16ead432de1b0bdf249290400f263cb";
@@ -611,7 +611,7 @@ let Secp256k1 =
  *
  * We recommend @dashincubator/secp256k1 and @noble/secp256k1.
  *
- * @param {Uint8Array} privateKey - an input's corresponding key
+ * @param {Uint8Array} privKeyBytes - an input's corresponding key
  * @param {Uint8Array} txHashBytes - the (not reversed) 2x-sha256-hash
  * @returns {String} - hex representation of an ASN.1 signature
  */
@@ -624,7 +624,7 @@ async function sign(privKeyBytes, txHashBytes) {
 
 async function toPublicKey(privKeyBytes) {
   let isCompressed = true;
-  let pubKeyBytes = Secp256k1.getPublicKey(privateKey, isCompressed);
+  let pubKeyBytes = Secp256k1.getPublicKey(privKeyBytes, isCompressed);
   return pubKeyBytes;
 }
 ```
