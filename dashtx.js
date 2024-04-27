@@ -1927,7 +1927,7 @@ if ("object" === typeof module) {
 /**
  * @callback TxToPublicKey
  * @param {TxPrivateKey} privateKey - buf
- * @returns {TxPublicKey} - public key buf
+ * @returns {Promise<TxPublicKey>} - public key buf
  */
 
 /**
