@@ -33,7 +33,7 @@
  * @prop {TxSortOutputs} sortOutputs
  * @prop {TxSum} sum - sums an array of TxInputUnspent
  * @prop {TxUtils} utils
- * @prop {Function} _create
+ * @prop {Function} serialize
  * @prop {Function} _createInsufficientFundsError
  * @prop {Function} _createMemoScript
  * @prop {Function} _debugPrint
@@ -354,7 +354,7 @@ var DashTx = ("object" === typeof module && exports) || {};
         txInfoSigned.inputs[i] = txInputSigned;
       }
 
-      txInfoSigned.transaction = Tx.createSigned(txInfoSigned);
+      txInfoSigned.transaction = Tx.serialize(txInfoSigned);
       return txInfoSigned;
     };
 
@@ -971,7 +971,7 @@ var DashTx = ("object" === typeof module && exports) || {};
       };
     });
 
-    let hex = Tx._create(opts);
+    let hex = Tx.serialize(opts);
     return hex;
   };
 
@@ -1006,7 +1006,7 @@ var DashTx = ("object" === typeof module && exports) || {};
       };
     });
 
-    let sigHashTxHex = Tx._create(txInfoHashable);
+    let sigHashTxHex = Tx.serialize(txInfoHashable);
     if (sigHashTxHex) {
       let sigHashTypeHex = TxUtils._toUint32LE(sigHashType);
       sigHashTxHex = `${sigHashTxHex}${sigHashTypeHex}`;
@@ -1015,7 +1015,7 @@ var DashTx = ("object" === typeof module && exports) || {};
   };
 
   Tx.createSigned = function (opts) {
-    let hex = Tx._create(opts);
+    let hex = Tx.serialize(opts);
     return hex;
   };
 
@@ -1027,7 +1027,7 @@ var DashTx = ("object" === typeof module && exports) || {};
    * @param {Uint32} [opts.version]
    * @param {Boolean} [opts._debug] - bespoke debug output
    */
-  Tx._create = function ({
+  Tx.serialize = function ({
     version = CURRENT_VERSION,
     inputs,
     locktime = 0x0,
