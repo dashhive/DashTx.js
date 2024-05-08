@@ -1006,11 +1006,7 @@ var DashTx = ("object" === typeof module && exports) || {};
       };
     });
 
-    let sigHashTxHex = Tx.serialize(txInfoHashable);
-    if (sigHashTxHex) {
-      let sigHashTypeHex = TxUtils._toUint32LE(sigHashType);
-      sigHashTxHex = `${sigHashTxHex}${sigHashTypeHex}`;
-    }
+    let sigHashTxHex = Tx.serialize(txInfoHashable, sigHashType);
     return sigHashTxHex;
   };
 
@@ -1026,15 +1022,19 @@ var DashTx = ("object" === typeof module && exports) || {};
    * @param {Array<TxOutput>} opts.outputs
    * @param {Uint32} [opts.version]
    * @param {Boolean} [opts._debug] - bespoke debug output
+   * @param {Uint32} [sigHashType]
    */
-  Tx.serialize = function ({
-    version = CURRENT_VERSION,
-    inputs,
-    locktime = 0x0,
-    outputs,
-    /* maxFee = 10000, */
-    _debug = false,
-  }) {
+  Tx.serialize = function (
+    {
+      version = CURRENT_VERSION,
+      inputs,
+      locktime = 0x0,
+      outputs,
+      /* maxFee = 10000, */
+      _debug = false,
+    },
+    sigHashType,
+  ) {
     let _sep = "";
     if (_debug) {
       _sep = "\n";
@@ -1052,6 +1052,12 @@ var DashTx = ("object" === typeof module && exports) || {};
     tx.push(locktimeHex);
 
     let txHex = tx.join(_sep);
+
+    if (sigHashType) {
+      let sigHashTypeHex = TxUtils._toUint32LE(sigHashType);
+      txHex = `${txHex}${sigHashTypeHex}`;
+    }
+
     return txHex;
   };
 
