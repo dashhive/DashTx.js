@@ -33,13 +33,11 @@
  * @prop {TxSortOutputs} sortOutputs
  * @prop {TxSum} sum - sums an array of TxInputUnspent
  * @prop {TxUtils} utils
- * @prop {Function} _addPrivKeyUtils
  * @prop {Function} _create
  * @prop {Function} _createInsufficientFundsError
  * @prop {Function} _createMemoScript
  * @prop {Function} _debugPrint
  * @prop {Function} _hash
- * @prop {Function} _hashAndSignAll
  * @prop {Function} _legacyMustSelectInputs
  * @prop {Function} _legacySelectOptimalUtxos
  * @prop {Function} _packInputs
@@ -238,14 +236,134 @@ var DashTx = ("object" === typeof module && exports) || {};
   };
 
   Tx.create = function (keyUtils) {
+    if (!keyUtils.getPrivateKey) {
+      throw new Error(`you must create with 'opts.getPrivateKey()'`);
+    }
+
+    if (!keyUtils.getPublicKey) {
+      if (!keyUtils.toPublicKey) {
+        const errGetPubKey =
+          "you must provide 'getPublicKey()' (efficient) or 'toPublicKey()' (to convert private key)";
+        throw new Error(errGetPubKey);
+      }
+
+      /** @type {TxGetPublicKey} */
+      keyUtils.getPublicKey = async function (txInput, i, txInputs) {
+        let privKeyBytes = await keyUtils.getPrivateKey(txInput, i, txInputs);
+        //@ts-ignore - toPublicKey *is* defined above
+        let pubKeyBytes = await keyUtils.toPublicKey(privKeyBytes);
+        if ("string" === typeof pubKeyBytes) {
+          throw new Error("toPublicKey() must return bytes (Uint8Array)");
+        }
+        return pubKeyBytes;
+      };
+    }
+
     let txInst = {};
 
     /** @type {TxHashAndSignAll} */
     txInst.hashAndSignAll = async function (txInfo) {
-      let privUtils = keyUtils;
-      void Tx._addPrivKeyUtils(privUtils);
+      let sortedInputs = txInfo.inputs.slice(0);
+      sortedInputs.sort(Tx.sortInputs);
+      for (let i = 0; i < sortedInputs.length; i += 1) {
+        let isSelf = sortedInputs[i] === txInfo.inputs[i];
+        if (!isSelf) {
+          console.warn(
+            `txInfo.inputs are not ordered correctly, use txInfo.inputs.sort(Tx.sortInputs)\n(this will be an exception in the next version)`,
+          );
+          break;
+        }
+      }
 
-      return await Tx._hashAndSignAll(txInfo, privUtils);
+      let sortedOutputs = txInfo.outputs.slice(0);
+      sortedOutputs.sort(Tx.sortOutputs);
+      for (let i = 0; i < sortedOutputs.length; i += 1) {
+        let isSelf = sortedOutputs[i] === txInfo.outputs[i];
+        if (!isSelf) {
+          console.warn(
+            `txInfo.outputs are not ordered correctly, use txInfo.outputs.sort(Tx.sortOutputs)\n(this will be an exception in the next version)`,
+          );
+          break;
+        }
+      }
+
+      /** @type {TxInfoSigned} */
+      let txInfoSigned = {
+        /** @type {Array<TxInputSigned>} */
+        inputs: [],
+        outputs: txInfo.outputs,
+        version: txInfo.version || CURRENT_VERSION,
+        locktime: txInfo.locktime || 0x00,
+        transaction: "",
+      };
+
+      for (let i = 0; i < txInfo.inputs.length; i += 1) {
+        let txInput = txInfo.inputs[i];
+        // TODO script -> lockScript, sigScript
+        //let lockScriptHex = txInput.script;
+        let _sigHashType = txInput.sigHashType ?? Tx.SIGHASH_ALL;
+        let txHashable = Tx.createHashable(txInfo, i, _sigHashType);
+        let txHashBuf = await Tx.hashPartial(txHashable, 0x00);
+        let privKey = await keyUtils.getPrivateKey(txInput, i, txInfo.inputs);
+
+        let sigBuf = await keyUtils.sign(privKey, txHashBuf);
+        let sigHex = "";
+        if ("string" === typeof sigBuf) {
+          console.warn(
+            `sign() should return a Uint8Array of an ASN.1 signature`,
+          );
+          sigHex = sigBuf;
+        } else {
+          sigHex = Tx.utils.bytesToHex(sigBuf);
+        }
+
+        let pubKeyHex = txInput.publicKey;
+        if (!pubKeyHex) {
+          let pubKey = await keyUtils.getPublicKey(txInput, i, txInfo.inputs);
+          pubKeyHex = Tx.utils.bytesToHex(pubKey);
+        }
+        if ("string" !== typeof pubKeyHex) {
+          let warn = new Error("stack");
+          console.warn(
+            `utxo inputs should be plain JSON and use hex rather than buffers for 'publicKey'`,
+            warn.stack,
+          );
+          pubKeyHex = Tx.utils.bytesToHex(pubKeyHex);
+        }
+
+        /** @type TxInputSigned */
+        let txInputSigned = {
+          txid: txInput.txId || txInput.txid,
+          txId: txInput.txId || txInput.txid,
+          outputIndex: txInput.outputIndex,
+          signature: sigHex,
+          publicKey: pubKeyHex,
+          sigHashType: _sigHashType,
+        };
+
+        // expose _actual_ values used, for debugging
+        let txHashHex = Tx.utils.bytesToHex(txHashBuf);
+        Object.assign({
+          _hash: txHashHex,
+          _signature: sigHex.toString(),
+          _lockScript: txInfo.inputs[i].script,
+          _publicKey: pubKeyHex,
+          _sigHashType: _sigHashType,
+        });
+
+        txInfoSigned.inputs[i] = txInputSigned;
+      }
+
+      let transaction = Tx.createSigned(txInfoSigned);
+
+      return {
+        //@ts-ignore - tsc doesn't support an enum here
+        inputs: txInfo.inputs,
+        locktime: txInfo.locktime || 0x0,
+        outputs: txInfo.outputs,
+        transaction: transaction,
+        version: txInfo.version || CURRENT_VERSION,
+      };
     };
 
     txInst.legacy = {};
@@ -734,36 +852,6 @@ var DashTx = ("object" === typeof module && exports) || {};
   };
 
   /**
-   * @param {TxDeps} privUtils
-   */
-  Tx._addPrivKeyUtils = function (privUtils) {
-    if (!privUtils.getPrivateKey) {
-      throw new Error(`you must create with 'opts.getPrivateKey()'`);
-    }
-
-    if (!privUtils.getPublicKey) {
-      const errGetPubKey =
-        "you must provide 'getPublicKey()' (efficient) or 'toPublicKey()' (to convert private key)";
-      if (!privUtils.toPublicKey) {
-        throw new Error(errGetPubKey);
-      }
-
-      /** @type {TxGetPublicKey} */
-      privUtils.getPublicKey = async function (txInput, i, txInputs) {
-        let privKeyBytes = await privUtils.getPrivateKey(txInput, i, txInputs);
-        //@ts-ignore - toPublicKey *is* defined above
-        let pubKeyBytes = await privUtils.toPublicKey(privKeyBytes);
-        if ("string" === typeof pubKeyBytes) {
-          throw new Error("toPublicKey() must return bytes (Uint8Array)");
-        }
-        return pubKeyBytes;
-      };
-    }
-
-    return privUtils;
-  };
-
-  /**
    * @template {Pick<CoreUtxo, "satoshis">} T
    * @param {Object} opts
    * @param {Array<T>} opts.utxos
@@ -877,139 +965,6 @@ var DashTx = ("object" === typeof module && exports) || {};
     let msg = `insufficient funds: cannot pay ${dashAmount} (+${feeAmount} fee) with ${dashBalance}`;
     let err = new Error(msg);
     throw err;
-  };
-
-  /**
-   * @param {TxInfo} txInfo
-   * TODO _param {Array<TxInputRaw>} txInfo.inputs - needs type narrowing check
-   * TODO _param {Array<TxOutput>} txInfo.outputs
-   * TODO _param {Uint32} [txInfo.version]
-   * TODO _param {Boolean} [txInfo._debug] - bespoke debug output
-   * @param {TxDeps} keyUtils
-   * @returns {Promise<TxInfoSigned>}
-   */
-  Tx._hashAndSignAll = async function (txInfo, keyUtils) {
-    let sortedInputs = txInfo.inputs.slice(0);
-    sortedInputs.sort(Tx.sortInputs);
-    for (let i = 0; i < sortedInputs.length; i += 1) {
-      let isSelf = sortedInputs[i] === txInfo.inputs[i];
-      if (!isSelf) {
-        console.warn(
-          `txInfo.inputs are not ordered correctly, use txInfo.inputs.sort(Tx.sortInputs)\n(this will be an exception in the next version)`,
-        );
-        break;
-      }
-    }
-
-    let sortedOutputs = txInfo.outputs.slice(0);
-    sortedOutputs.sort(Tx.sortOutputs);
-    for (let i = 0; i < sortedOutputs.length; i += 1) {
-      let isSelf = sortedOutputs[i] === txInfo.outputs[i];
-      if (!isSelf) {
-        console.warn(
-          `txInfo.outputs are not ordered correctly, use txInfo.outputs.sort(Tx.sortOutputs)\n(this will be an exception in the next version)`,
-        );
-        break;
-      }
-    }
-
-    /** @type {TxInfoSigned} */
-    let txInfoSigned = {
-      /** @type {Array<TxInputSigned>} */
-      inputs: [],
-      outputs: txInfo.outputs,
-      version: txInfo.version || CURRENT_VERSION,
-      locktime: txInfo.locktime || 0x00,
-      transaction: "",
-    };
-
-    /**
-     * @param {TxPrivateKey} privKey
-     */
-    function createGetPrivateKey(privKey) {
-      return function () {
-        return privKey;
-      };
-    }
-
-    function throwGetPrivateKeyError() {
-      if (false) {
-        return new Uint8Array(0);
-      }
-
-      const msg =
-        "getPrivateKey() is only valid for the lifetime of transaction signing process";
-      throw new Error(msg);
-    }
-
-    for (let i = 0; i < txInfo.inputs.length; i += 1) {
-      let txInput = txInfo.inputs[i];
-      // TODO script -> lockScript, sigScript
-      //let lockScriptHex = txInput.script;
-      let _sigHashType = txInput.sigHashType ?? Tx.SIGHASH_ALL;
-      let txHashable = Tx.createHashable(txInfo, i, _sigHashType);
-      let txHashBuf = await Tx.hashPartial(txHashable, 0x00);
-      let privKey = await keyUtils.getPrivateKey(txInput, i, txInfo.inputs);
-
-      let sigBuf = await keyUtils.sign(privKey, txHashBuf);
-      let sigHex = "";
-      if ("string" === typeof sigBuf) {
-        console.warn(`sign() should return a Uint8Array of an ASN.1 signature`);
-        sigHex = sigBuf;
-      } else {
-        sigHex = Tx.utils.bytesToHex(sigBuf);
-      }
-
-      let pubKeyHex = txInput.publicKey;
-      if (!pubKeyHex) {
-        let getPrivateKey = createGetPrivateKey(privKey);
-        let _txInput = Object.assign({}, { getPrivateKey }, txInput);
-        let pubKey = await keyUtils.getPublicKey(_txInput, i, txInfo.inputs);
-        pubKeyHex = Tx.utils.bytesToHex(pubKey);
-        _txInput.getPrivateKey = throwGetPrivateKeyError;
-      }
-      if ("string" !== typeof pubKeyHex) {
-        let warn = new Error("stack");
-        console.warn(
-          `utxo inputs should be plain JSON and use hex rather than buffers for 'publicKey'`,
-          warn.stack,
-        );
-        pubKeyHex = Tx.utils.bytesToHex(pubKeyHex);
-      }
-
-      /** @type TxInputSigned */
-      let txInputSigned = {
-        txid: txInput.txId || txInput.txid,
-        txId: txInput.txId || txInput.txid,
-        outputIndex: txInput.outputIndex,
-        signature: sigHex,
-        publicKey: pubKeyHex,
-        sigHashType: _sigHashType,
-      };
-
-      // expose _actual_ values used, for debugging
-      let txHashHex = Tx.utils.bytesToHex(txHashBuf);
-      Object.assign({
-        _hash: txHashHex,
-        _signature: sigHex.toString(),
-        _lockScript: txInfo.inputs[i].script,
-        _publicKey: pubKeyHex,
-        _sigHashType: _sigHashType,
-      });
-
-      txInfoSigned.inputs[i] = txInputSigned;
-    }
-
-    let transaction = Tx.createSigned(txInfoSigned);
-
-    return {
-      //@ts-ignore - tsc doesn't support an enum here
-      inputs: txInfo.inputs,
-      locktime: txInfo.locktime || 0x0,
-      outputs: txInfo.outputs,
-      transaction: transaction,
-      version: txInfo.version || CURRENT_VERSION,
-    };
   };
 
   Tx.createRaw = function (opts) {
