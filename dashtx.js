@@ -343,7 +343,7 @@ var DashTx = ("object" === typeof module && exports) || {};
 
         // expose _actual_ values used, for debugging
         let txHashHex = Tx.utils.bytesToHex(txHashBuf);
-        Object.assign({
+        Object.assign(txInputSigned, {
           _hash: txHashHex,
           _signature: sigHex.toString(),
           _lockScript: txInfo.inputs[i].script,
