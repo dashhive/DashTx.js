@@ -18,7 +18,9 @@
  * @prop {TxCreate} create
  * @prop {TxCreateDonationOutput} createDonationOutput
  * @prop {TxCreateRaw} createRaw
+ * @prop {TxCreateRawInput} createRawInput
  * @prop {TxCreateHashable} createHashable
+ * @prop {TxCreateSigHashInput} createSigHashInput
  * @prop {TxCreateSigned} createSigned
  * @prop {TxGetId} getId - only useful for fully signed tx
  * @prop {TxHashPartial} hashPartial - useful for computing sigs
@@ -961,55 +963,73 @@ var DashTx = ("object" === typeof module && exports) || {};
     throw err;
   };
 
-  Tx.createRaw = function (opts) {
-    opts = Object.assign({}, opts);
-    opts.inputs = opts.inputs.map(function (input) {
-      return {
-        //@ts-ignore - workaround for txId (insight) vs txid (dashcore rpc utxo) issue
-        // (picking 'txId' over 'txid' may have been a mistake in a recent update)
-        txid: input.txId || input.txid,
-        txId: input.txId || input.txid,
-        outputIndex: input.outputIndex,
-      };
-    });
+  // TODO createRequest
+  Tx.createRaw = function (txInfo) {
+    let txInfoRaw = Object.assign({}, txInfo);
 
-    let hex = Tx.serialize(opts);
+    txInfoRaw.inputs = [];
+    for (let i = 0; i < txInfo.inputs.length; i += 1) {
+      let input = txInfo.inputs[i];
+      let rawInput = Tx.createRawInput(input, i);
+      txInfoRaw.inputs.push(rawInput);
+    }
+
+    let hex = Tx.serialize(txInfoRaw);
     return hex;
+  };
+
+  // TODO createRequestInput
+  Tx.createRawInput = function (input, i) {
+    let rawInput = {
+      txid: input.txId || input.txid,
+      txId: input.txId || input.txid,
+      outputIndex: input.outputIndex,
+    };
+
+    return rawInput;
   };
 
   Tx.createHashable = function (txInfo, inputIndex, sigHashType) {
     let txInfoHashable = Object.assign({}, txInfo);
+
     /** @type {Array<TxInputRaw|TxInputHashable>} */
-    txInfoHashable.inputs = txInfo.inputs.map(function (input, i) {
-      if (inputIndex !== i) {
-        return {
-          txid: input.txId || input.txid,
-          txId: input.txId || input.txid,
-          outputIndex: input.outputIndex,
-        };
+    txInfoHashable.inputs = [];
+    for (let i = 0; i < txInfo.inputs.length; i += 1) {
+      let input = txInfo.inputs[i];
+      if (inputIndex === i) {
+        let sighashInput = Tx.createSigHashInput(input, i);
+        txInfoHashable.inputs.push(sighashInput);
+        continue;
       }
 
-      let lockScript = input.script;
-      if (!lockScript) {
-        if (!input.pubKeyHash) {
-          throw new Error(
-            `signable input must have either 'pubKeyHash' or 'script'`,
-          );
-        }
-        lockScript = `${OP_DUP}${OP_HASH160}${PKH_SIZE}${input.pubKeyHash}${OP_EQUALVERIFY}${OP_CHECKSIG}`;
+      if (!(sigHashType & Tx.SIGHASH_ANYONECANPAY)) {
+        let rawInput = Tx.createRawInput(input, i);
+        txInfoHashable.inputs.push(rawInput);
       }
-      return {
-        txId: input.txId || input.txid,
-        txid: input.txId || input.txid,
-        outputIndex: input.outputIndex,
-        pubKeyHash: input.pubKeyHash,
-        sigHashType: input.sigHashType,
-        script: lockScript,
-      };
-    });
+    }
 
-    let sigHashTxHex = Tx.serialize(txInfoHashable, sigHashType);
-    return sigHashTxHex;
+    let txHex = Tx.serialize(txInfoHashable, sigHashType);
+    return txHex;
+  };
+
+  Tx.createSigHashInput = function (input, i) {
+    let lockScript = input.script;
+    if (!lockScript) {
+      if (!input.pubKeyHash) {
+        throw new Error(
+          `signable input must have either 'pubKeyHash' or 'script'`,
+        );
+      }
+      lockScript = `${OP_DUP}${OP_HASH160}${PKH_SIZE}${input.pubKeyHash}${OP_EQUALVERIFY}${OP_CHECKSIG}`;
+    }
+    return {
+      txId: input.txId || input.txid,
+      txid: input.txId || input.txid,
+      outputIndex: input.outputIndex,
+      pubKeyHash: input.pubKeyHash,
+      sigHashType: input.sigHashType,
+      script: lockScript,
+    };
   };
 
   Tx.createSigned = function (opts) {
@@ -2033,12 +2053,25 @@ if ("object" === typeof module) {
  */
 
 /**
+ * @callback TxCreateSigHashInput
+ * @param {TxInputHashable} input
+ * @param {Uint32} inputIndex - create hashable tx for this input
+ */
+
+/**
  * @callback TxCreateRaw
  * @param {Object} opts
  * @param {Array<TxInputRaw>} opts.inputs
  * @param {Array<TxOutput>} opts.outputs
  * @param {Uint32} [opts.version]
  * @param {Boolean} [opts._debug] - bespoke debug output
+ * @returns {String} - raw tx hex
+ */
+
+/**
+ * @callback TxCreateRawInput
+ * @param {TxInputRaw} input
+ * @param {Uint32} i
  */
 
 /**
