@@ -67,6 +67,7 @@
 /**
  * @typedef tx
  * @prop {TxHashAndSignAll} hashAndSignAll
+ * @prop {TxHashAndSignInput} hashAndSignInput
  */
 
 /** @type {Tx} */
@@ -265,7 +266,7 @@ var DashTx = ("object" === typeof module && exports) || {};
     let txInst = {};
 
     /** @type {TxHashAndSignAll} */
-    txInst.hashAndSignAll = async function (txInfo) {
+    txInst.hashAndSignAll = async function (txInfo, sigHashType) {
       let sortedInputs = txInfo.inputs.slice(0);
       sortedInputs.sort(Tx.sortInputs);
       for (let i = 0; i < sortedInputs.length; i += 1) {
@@ -301,65 +302,73 @@ var DashTx = ("object" === typeof module && exports) || {};
       };
 
       for (let i = 0; i < txInfo.inputs.length; i += 1) {
-        let txInput = txInfo.inputs[i];
-        // TODO script -> lockScript, sigScript
-        //let lockScriptHex = txInput.script;
-        let _sigHashType = txInput.sigHashType ?? Tx.SIGHASH_ALL;
-        let txHex = Tx.createHashable(txInfo, i, _sigHashType);
-        let txBytes = Tx.utils.hexToBytes(txHex);
-        let txHashBuf = await Tx.doubleSha256(txBytes);
-        let privKey = await keyUtils.getPrivateKey(txInput, i, txInfo.inputs);
+        let txInputSigned = await txInst.hashAndSignInput(
+          txInfo,
+          i,
+          sigHashType,
+        );
 
-        let sigBuf = await keyUtils.sign(privKey, txHashBuf);
-        let sigHex = "";
-        if ("string" === typeof sigBuf) {
-          console.warn(
-            `sign() should return a Uint8Array of an ASN.1 signature`,
-          );
-          sigHex = sigBuf;
-        } else {
-          sigHex = Tx.utils.bytesToHex(sigBuf);
-        }
-
-        let pubKeyHex = txInput.publicKey;
-        if (!pubKeyHex) {
-          let pubKey = await keyUtils.getPublicKey(txInput, i, txInfo.inputs);
-          pubKeyHex = Tx.utils.bytesToHex(pubKey);
-        }
-        if ("string" !== typeof pubKeyHex) {
-          let warn = new Error("stack");
-          console.warn(
-            `utxo inputs should be plain JSON and use hex rather than buffers for 'publicKey'`,
-            warn.stack,
-          );
-          pubKeyHex = Tx.utils.bytesToHex(pubKeyHex);
-        }
-
-        /** @type TxInputSigned */
-        let txInputSigned = {
-          txid: txInput.txId || txInput.txid,
-          txId: txInput.txId || txInput.txid,
-          outputIndex: txInput.outputIndex,
-          signature: sigHex,
-          publicKey: pubKeyHex,
-          sigHashType: _sigHashType,
-        };
-
-        // expose _actual_ values used, for debugging
-        let txHashHex = Tx.utils.bytesToHex(txHashBuf);
-        Object.assign(txInputSigned, {
-          _hash: txHashHex,
-          _signature: sigHex.toString(),
-          _lockScript: txInfo.inputs[i].script,
-          _publicKey: pubKeyHex,
-          _sigHashType: _sigHashType,
-        });
-
-        txInfoSigned.inputs[i] = txInputSigned;
+        txInfoSigned.inputs.push(txInputSigned);
       }
 
       txInfoSigned.transaction = Tx.serialize(txInfoSigned);
       return txInfoSigned;
+    };
+
+    /** @type {TxHashAndSignInput} */
+    txInst.hashAndSignInput = async function (txInfo, i, sigHashType) {
+      let txInput = txInfo.inputs[i];
+
+      let _sigHashType = txInput.sigHashType ?? sigHashType ?? Tx.SIGHASH_ALL;
+      let txHex = Tx.createHashable(txInfo, i, _sigHashType);
+      let txBytes = Tx.utils.hexToBytes(txHex);
+      let txHashBuf = await Tx.doubleSha256(txBytes);
+      let privKey = await keyUtils.getPrivateKey(txInput, i, txInfo.inputs);
+
+      let sigBuf = await keyUtils.sign(privKey, txHashBuf);
+      let sigHex = "";
+      if ("string" === typeof sigBuf) {
+        console.warn(`sign() should return a Uint8Array of an ASN.1 signature`);
+        sigHex = sigBuf;
+      } else {
+        sigHex = Tx.utils.bytesToHex(sigBuf);
+      }
+
+      let pubKeyHex = txInput.publicKey;
+      if (!pubKeyHex) {
+        let pubKey = await keyUtils.getPublicKey(txInput, i, txInfo.inputs);
+        pubKeyHex = Tx.utils.bytesToHex(pubKey);
+      }
+      if ("string" !== typeof pubKeyHex) {
+        let warn = new Error("stack");
+        console.warn(
+          `utxo inputs should be plain JSON and use hex rather than buffers for 'publicKey'`,
+          warn.stack,
+        );
+        pubKeyHex = Tx.utils.bytesToHex(pubKeyHex);
+      }
+
+      /** @type TxInputSigned */
+      let txInputSigned = {
+        txid: txInput.txId || txInput.txid,
+        txId: txInput.txId || txInput.txid,
+        outputIndex: txInput.outputIndex,
+        signature: sigHex,
+        publicKey: pubKeyHex,
+        sigHashType: _sigHashType,
+      };
+
+      // expose _actual_ values used, for debugging
+      let txHashHex = Tx.utils.bytesToHex(txHashBuf);
+      Object.assign(txInputSigned, {
+        _hash: txHashHex,
+        _signature: sigHex.toString(),
+        _lockScript: txInfo.inputs[i].script,
+        _publicKey: pubKeyHex,
+        _sigHashType: _sigHashType,
+      });
+
+      return txInputSigned;
     };
 
     txInst.legacy = {};
@@ -2094,6 +2103,14 @@ if ("object" === typeof module) {
 /**
  * @callback TxHashAndSignAll
  * @param {TxInfo} txInfo
+ * @param {Uint32} [sigHashType]
+ */
+
+/**
+ * @callback TxHashAndSignInput
+ * @param {TxInfo} txInfo
+ * @param {Uint32} i
+ * @param {Uint32} [sigHashType]
  */
 
 /**
