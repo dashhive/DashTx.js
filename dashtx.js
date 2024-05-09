@@ -354,16 +354,8 @@ var DashTx = ("object" === typeof module && exports) || {};
         txInfoSigned.inputs[i] = txInputSigned;
       }
 
-      let transaction = Tx.createSigned(txInfoSigned);
-
-      return {
-        //@ts-ignore - tsc doesn't support an enum here
-        inputs: txInfo.inputs,
-        locktime: txInfo.locktime || 0x0,
-        outputs: txInfo.outputs,
-        transaction: transaction,
-        version: txInfo.version || CURRENT_VERSION,
-      };
+      txInfoSigned.transaction = Tx.createSigned(txInfoSigned);
+      return txInfoSigned;
     };
 
     txInst.legacy = {};
