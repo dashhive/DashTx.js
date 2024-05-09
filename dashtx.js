@@ -18,9 +18,9 @@
  * @prop {TxCreate} create
  * @prop {TxCreateDonationOutput} createDonationOutput
  * @prop {TxCreateRaw} createRaw
- * @prop {TxCreateRawInput} createRawInput
+ * @prop {TxCreateInputRaw} createInputRaw
  * @prop {TxCreateHashable} createHashable
- * @prop {TxCreateSigHashInput} createSigHashInput
+ * @prop {TxCreateInputForSig} createInputForSig
  * @prop {TxCreateSigned} createSigned
  * @prop {TxGetId} getId - only useful for fully signed tx
  * @prop {TxHashPartial} hashPartial - useful for computing sigs
@@ -970,7 +970,7 @@ var DashTx = ("object" === typeof module && exports) || {};
     txInfoRaw.inputs = [];
     for (let i = 0; i < txInfo.inputs.length; i += 1) {
       let input = txInfo.inputs[i];
-      let rawInput = Tx.createRawInput(input, i);
+      let rawInput = Tx.createInputRaw(input, i);
       txInfoRaw.inputs.push(rawInput);
     }
 
@@ -979,7 +979,7 @@ var DashTx = ("object" === typeof module && exports) || {};
   };
 
   // TODO createRequestInput
-  Tx.createRawInput = function (input, i) {
+  Tx.createInputRaw = function (input, i) {
     let rawInput = {
       txid: input.txId || input.txid,
       txId: input.txId || input.txid,
@@ -997,13 +997,13 @@ var DashTx = ("object" === typeof module && exports) || {};
     for (let i = 0; i < txInfo.inputs.length; i += 1) {
       let input = txInfo.inputs[i];
       if (inputIndex === i) {
-        let sighashInput = Tx.createSigHashInput(input, i);
+        let sighashInput = Tx.createInputForSig(input, i);
         txInfoHashable.inputs.push(sighashInput);
         continue;
       }
 
       if (!(sigHashType & Tx.SIGHASH_ANYONECANPAY)) {
-        let rawInput = Tx.createRawInput(input, i);
+        let rawInput = Tx.createInputRaw(input, i);
         txInfoHashable.inputs.push(rawInput);
       }
     }
@@ -1012,7 +1012,7 @@ var DashTx = ("object" === typeof module && exports) || {};
     return txHex;
   };
 
-  Tx.createSigHashInput = function (input, i) {
+  Tx.createInputForSig = function (input, i) {
     let lockScript = input.script;
     if (!lockScript) {
       if (!input.pubKeyHash) {
@@ -2053,7 +2053,7 @@ if ("object" === typeof module) {
  */
 
 /**
- * @callback TxCreateSigHashInput
+ * @callback TxCreateInputForSig
  * @param {TxInputHashable} input
  * @param {Uint32} inputIndex - create hashable tx for this input
  */
@@ -2069,7 +2069,7 @@ if ("object" === typeof module) {
  */
 
 /**
- * @callback TxCreateRawInput
+ * @callback TxCreateInputRaw
  * @param {TxInputRaw} input
  * @param {Uint32} i
  */
