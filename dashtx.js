@@ -41,7 +41,9 @@
  * @prop {Function} _legacyMustSelectInputs
  * @prop {Function} _legacySelectOptimalUtxos
  * @prop {Function} _packInputs
+ * @prop {Function} _packInput
  * @prop {Function} _packOutputs
+ * @prop {Function} _packOutput
  * @prop {Function} _parse
  */
 
@@ -1073,72 +1075,86 @@ var DashTx = ("object" === typeof module && exports) || {};
     let nInputs = Tx.utils.toVarInt(inputs.length);
     tx.push(nInputs);
 
-    for (let input of inputs) {
-      let inputHex = [];
-
-      let txid = input.txId || input.txid;
-      if (!txid) {
-        throw new Error("missing required utxo property 'txid'");
-      }
-
-      if (64 !== txid.length) {
-        throw new Error(
-          `expected uxto property 'txid' to be a valid 64-character (32-byte) hex string, but got '${txid}' (size ${txid.length})`,
-        );
-      }
-
-      assertHex(txid, "txid");
-
-      let reverseTxId = Tx.utils.reverseHex(txid);
-      inputHex.push(reverseTxId);
-
-      let voutIndex = input.outputIndex;
-      if (isNaN(voutIndex)) {
-        throw new Error(
-          "expected utxo property 'outputIndex' to be an integer representing this input's previous output index",
-        );
-      }
-      let reverseVout = TxUtils._toUint32LE(voutIndex);
-      inputHex.push(reverseVout);
-
-      //@ts-ignore - enum types not handled properly here
-      if (input.signature) {
-        //@ts-ignore
-        let sigHashTypeVar = Tx.utils.toVarInt(input.sigHashType);
-        //@ts-ignore
-        let sig = `${input.signature}${sigHashTypeVar}`;
-        let sigSize = Tx.utils.toVarInt(sig.length / 2);
-
-        //@ts-ignore
-        let keySize = Tx.utils.toVarInt(input.publicKey.length / 2);
-        //@ts-ignore
-        let sigScript = `${sigSize}${sig}${keySize}${input.publicKey}`;
-        let sigScriptLen = sigScript.length / 2;
-        let sigScriptLenSize = Tx.utils.toVarInt(sigScriptLen);
-        inputHex.push(sigScriptLenSize);
-        inputHex.push(sigScript);
-        //@ts-ignore
-      } else if (input.script) {
-        //@ts-ignore
-        let lockScript = input.script;
-        //@ts-ignore
-        let lockScriptLen = input.script.length / 2;
-        let lockScriptLenSize = Tx.utils.toVarInt(lockScriptLen);
-        inputHex.push(lockScriptLenSize);
-        inputHex.push(lockScript);
-      } else {
-        let rawScriptSize = "00";
-        let rawScript = "";
-        inputHex.push(rawScriptSize);
-        inputHex.push(rawScript);
-      }
-
-      let sequence = "ffffffff";
-      inputHex.push(sequence);
-
+    for (let i = 0; i < inputs.length; i += 1) {
+      let input = inputs[i];
+      let inputHex = Tx._packInput(input, i, { _sep: _sep });
       let txIn = inputHex.join(_sep);
       tx.push(txIn);
     }
+
+    return tx;
+  };
+
+  /**
+   * Privately exported for use by DashJoin.js
+   * @param {TxInputRaw|TxInputHashable|TxInputSigned} input
+   * @param {Uint32} i - input index
+   * @param {Object} opts
+   * @param {Array<String>} opts.tx
+   * @param {String} [opts._sep] - string to join hex segements ('' or '\n')
+   * @returns {Array<String>} - tx (original is modified if provided)
+   */
+  Tx._packInput = function (input, i, opts) {
+    let tx = opts?.tx || [];
+
+    if (!input.txid) {
+      throw new Error("missing required utxo property 'txid'");
+    }
+
+    if (64 !== input.txid.length) {
+      throw new Error(
+        `expected uxto property 'txid' to be a valid 64-character (32-byte) hex string, but got '${input.txid}' (size ${input.txid.length})`,
+      );
+    }
+
+    assertHex(input.txid, "txid");
+
+    let reverseTxId = Tx.utils.reverseHex(input.txid);
+    tx.push(reverseTxId);
+
+    let voutIndex = input.outputIndex;
+    if (isNaN(voutIndex)) {
+      throw new Error(
+        `expected utxo property 'input[${i}]outputIndex' to be an integer representing this input's previous output index`,
+      );
+    }
+    let reverseVout = TxUtils._toUint32LE(voutIndex);
+    tx.push(reverseVout);
+
+    //@ts-ignore - enum types not handled properly here
+    if (input.signature) {
+      //@ts-ignore
+      let sigHashTypeVar = Tx.utils.toVarInt(input.sigHashType);
+      //@ts-ignore
+      let sig = `${input.signature}${sigHashTypeVar}`;
+      let sigSize = Tx.utils.toVarInt(sig.length / 2);
+
+      //@ts-ignore
+      let keySize = Tx.utils.toVarInt(input.publicKey.length / 2);
+      //@ts-ignore
+      let sigScript = `${sigSize}${sig}${keySize}${input.publicKey}`;
+      let sigScriptLen = sigScript.length / 2;
+      let sigScriptLenSize = Tx.utils.toVarInt(sigScriptLen);
+      tx.push(sigScriptLenSize);
+      tx.push(sigScript);
+      //@ts-ignore
+    } else if (input.script) {
+      //@ts-ignore
+      let lockScript = input.script;
+      //@ts-ignore
+      let lockScriptLen = input.script.length / 2;
+      let lockScriptLenSize = Tx.utils.toVarInt(lockScriptLen);
+      tx.push(lockScriptLenSize);
+      tx.push(lockScript);
+    } else {
+      let rawScriptSize = "00";
+      let rawScript = "";
+      tx.push(rawScriptSize);
+      tx.push(rawScript);
+    }
+
+    let sequence = "ffffffff";
+    tx.push(sequence);
 
     return tx;
   };
@@ -1161,51 +1177,64 @@ var DashTx = ("object" === typeof module && exports) || {};
 
     for (let i = 0; i < outputs.length; i += 1) {
       let output = outputs[i];
-
-      if (output.message) {
-        if (!output.memo) {
-          output.memo = TxUtils.strToHex(output.message);
-        }
-      }
-      if (output.memo) {
-        let invalid = output.satoshis || output.address || output.pubKeyHash;
-        if (invalid) {
-          throw new Error(
-            `memo outputs must not have 'satoshis', 'address', or 'pubKeyHash'`,
-          );
-        }
-
-        let outputHex = Tx._createMemoScript(output.memo, i);
-
-        let txOut = outputHex.join(_sep);
-        tx.push(txOut);
-        continue;
-      }
-
-      /** @type {Array<String>} */
-      let outputHex = [];
-
-      if (!output.satoshis) {
-        throw new Error(`every output must have 'satoshis'`);
-      }
-      let satoshis = TxUtils._toUint64LE(output.satoshis);
-      outputHex.push(satoshis);
-
-      if (!output.pubKeyHash) {
-        throw new Error(`every output must have 'pubKeyHash' as a hex string`);
-      }
-      assertHex(output.pubKeyHash, `output[${i}].pubKeyHash`);
-
-      outputHex.push(PKH_SCRIPT_SIZE);
-      //let lockScript = `${OP_DUP}${OP_HASH160}${PKH_SIZE}${output.pubKeyHash}${OP_EQUALVERIFY}${OP_CHECKSIG}`;
-      outputHex.push(`${OP_DUP}${OP_HASH160}`);
-      outputHex.push(PKH_SIZE);
-      outputHex.push(output.pubKeyHash);
-      outputHex.push(`${OP_EQUALVERIFY}${OP_CHECKSIG}`);
-
+      let outputHex = Tx._packOutput(output, { _sep });
       let txOut = outputHex.join(_sep);
       tx.push(txOut);
     }
+
+    return tx;
+  };
+
+  /**
+   * Privately exported for use by DashJoin.js
+   * @param {TxOutput} output
+   * @param {Uint32} i
+   * @param {Object} opts
+   * @param {Array<String>} opts.tx
+   * @param {String} [opts._sep] - string to join hex segements ('' or '\n')
+   * @returns {Array<String>} - tx (original is modified if provided)
+   */
+  Tx._packOutput = function (output, i, opts) {
+    let tx = opts?.tx || [];
+    let _sep = opts?._sep || "";
+
+    if (output.message) {
+      if (!output.memo) {
+        output.memo = TxUtils.strToHex(output.message);
+      }
+    }
+    if (output.memo) {
+      let invalid = output.satoshis || output.address || output.pubKeyHash;
+      if (invalid) {
+        throw new Error(
+          `memo outputs must not have 'satoshis', 'address', or 'pubKeyHash'`,
+        );
+      }
+
+      let memoScriptHex = Tx._createMemoScript(output.memo, i);
+      let txOut = memoScriptHex.join(_sep);
+
+      tx.push(txOut);
+      return tx;
+    }
+
+    if (!output.satoshis) {
+      throw new Error(`every output must have 'satoshis'`);
+    }
+    let satoshis = TxUtils._toUint64LE(output.satoshis);
+    tx.push(satoshis);
+
+    if (!output.pubKeyHash) {
+      throw new Error(`every output must have 'pubKeyHash' as a hex string`);
+    }
+    assertHex(output.pubKeyHash, `output[${i}].pubKeyHash`);
+
+    tx.push(PKH_SCRIPT_SIZE);
+    //let lockScript = `${OP_DUP}${OP_HASH160}${PKH_SIZE}${output.pubKeyHash}${OP_EQUALVERIFY}${OP_CHECKSIG}`;
+    tx.push(`${OP_DUP}${OP_HASH160}`);
+    tx.push(PKH_SIZE);
+    tx.push(output.pubKeyHash);
+    tx.push(`${OP_EQUALVERIFY}${OP_CHECKSIG}`);
 
     return tx;
   };
