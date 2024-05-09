@@ -382,7 +382,8 @@ var DashTx = ("object" === typeof module && exports) || {};
         {
           _transaction: txHex,
           _hash: Tx.utils.bytesToHex(txHashBuf),
-          _lockScript: txForSig.inputs[i].script,
+          _indexForSig: txSigHash.indexForSig,
+          _lockScript: txSigHash.inputs[txSigHash.indexForSig].script,
         },
         txInput,
         {
@@ -394,7 +395,6 @@ var DashTx = ("object" === typeof module && exports) || {};
           sigHashType: _sigHashType,
         },
       );
-
       return txInputSigned;
     };
 
@@ -1060,7 +1060,7 @@ var DashTx = ("object" === typeof module && exports) || {};
   };
 
   Tx.createForSig = function (txInfo, inputIndex, sigHashType) {
-    let txForSig = Object.assign({}, txInfo);
+    let txForSig = Object.assign({ indexForSig: -1 }, txInfo);
 
     /** @type {Array<TxInputRaw|TxInputForSig>} */
     txForSig.inputs = [];
@@ -1068,7 +1068,7 @@ var DashTx = ("object" === typeof module && exports) || {};
       let input = txInfo.inputs[i];
       if (inputIndex === i) {
         let sighashInput = Tx.createInputForSig(input, i);
-        txForSig.inputs.push(sighashInput);
+        txForSig.indexForSig += txForSig.inputs.push(sighashInput);
         continue;
       }
 
