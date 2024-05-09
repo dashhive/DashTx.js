@@ -129,6 +129,7 @@ var DashTx = ("object" === typeof module && exports) || {};
   //@ts-ignore - for debug only
   Tx._PKH_SCRIPT_SIZE_HEX = PKH_SCRIPT_SIZE;
 
+  const E_KEYBYTES_UNDEFINED = `developer error: keyUtils.getPrivateKey() must return 'keyBytes' to sign, or 'null' to skip`;
   const E_LITTLE_INT =
     "JavaScript 'Number's only go up to uint53, you must use 'BigInt' (ex: `let amount = 18014398509481984n`) for larger values";
   const E_TOO_BIG_INT =
@@ -308,13 +309,24 @@ var DashTx = ("object" === typeof module && exports) || {};
       };
 
       for (let i = 0; i < txInfo.inputs.length; i += 1) {
-        let txInputSigned = await txInst.hashAndSignInput(
-          txInfo,
-          i,
-          sigHashType,
-        );
+        let txInput = txInfo.inputs[i];
+        let privBytes = await keyUtils.getPrivateKey(txInput, i, txInfo.inputs);
+        if (privBytes) {
+          txInput = await txInst.hashAndSignInput(
+            privBytes,
+            txInfo,
+            i,
+            sigHashType,
+          );
+        } else if (privBytes !== null) {
+          throw new Error(E_KEYBYTES_UNDEFINED);
+        } else {
+          // same as txInput = Tx.createInputRaw(txInput, i);
+          // (but we don't want to strip .address, etc)
+        }
 
-        txInfoSigned.inputs.push(txInputSigned);
+        //@ts-ignore - TODO - may be partially signed
+        txInfoSigned.inputs.push(txInput);
       }
 
       txInfoSigned.transaction = Tx.serialize(txInfoSigned);
@@ -322,22 +334,27 @@ var DashTx = ("object" === typeof module && exports) || {};
     };
 
     /** @type {TxHashAndSignInput} */
-    txInst.hashAndSignInput = async function (txInfo, i, sigHashType) {
+    txInst.hashAndSignInput = async function (
+      privBytes,
+      txInfo,
+      i,
+      sigHashType,
+    ) {
       let txInput = txInfo.inputs[i];
 
       let _sigHashType = txInput.sigHashType ?? sigHashType ?? Tx.SIGHASH_ALL;
 
-      let inputs = Tx.selectSigHashInputs(txInfo, i, _sigHashType);
-      let outputs = Tx.selectSigHashOutputs(txInfo, i, _sigHashType);
-      let txForSig = Object.assign({}, txInfo, { inputs, outputs });
+      // let inputs = Tx.selectSigHashInputs(txInfo, i, _sigHashType);
+      // let outputs = Tx.selectSigHashOutputs(txInfo, i, _sigHashType);
+      // let txForSig = Object.assign({}, txInfo, { inputs, outputs });
+      // let txSigHash = Tx.createForSig(txForSig, i, _sigHashType);
 
-      let txSigHash = Tx.createForSig(txForSig, i, _sigHashType);
+      let txSigHash = Tx.createForSig(txInfo, i, _sigHashType);
       let txHex = Tx.serialize(txSigHash, _sigHashType);
       let txBytes = Tx.utils.hexToBytes(txHex);
       let txHashBuf = await Tx.doubleSha256(txBytes);
-      let privKey = await keyUtils.getPrivateKey(txInput, i, txInfo.inputs);
 
-      let sigBuf = await keyUtils.sign(privKey, txHashBuf);
+      let sigBuf = await keyUtils.sign(privBytes, txHashBuf);
       let sigHex = "";
       if ("string" === typeof sigBuf) {
         console.warn(`sign() should return a Uint8Array of an ASN.1 signature`);
@@ -2107,6 +2124,7 @@ if ("object" === typeof module) {
 
 /**
  * @callback TxHashAndSignInput
+ * @param {Uint8Array} privBytes
  * @param {TxInfo} txInfo
  * @param {Uint32} i
  * @param {Uint32} [sigHashType]
