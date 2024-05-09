@@ -21,7 +21,7 @@
  * @prop {TxCreateDonationOutput} createDonationOutput
  * @prop {TxCreateRaw} createRaw
  * @prop {TxCreateInputRaw} createInputRaw
- * @prop {TxCreateHashable} createHashable
+ * @prop {TxCreateForSig} createForSig
  * @prop {TxCreateInputForSig} createInputForSig
  * @prop {TxCreateSigned} createSigned
  * @prop {TxGetId} getId - only useful for fully signed tx
@@ -29,7 +29,7 @@
  * @prop {TxDoubleSha256} doubleSha256
  * @prop {TxParseUnknown} parseUnknown
  * @prop {TxParseRequest} parseRequest
- * @prop {TxParseHashable} parseHashable
+ * @prop {TxParseSigHash} parseSigHash
  * @prop {TxParseSigned} parseSigned
  * @prop {TxSelectSigHashInputs} selectSigHashInputs
  * @prop {TxSelectSigHashOutputs} selectSigHashOutputs
@@ -329,9 +329,10 @@ var DashTx = ("object" === typeof module && exports) || {};
 
       let inputs = Tx.selectSigHashInputs(txInfo, i, _sigHashType);
       let outputs = Tx.selectSigHashOutputs(txInfo, i, _sigHashType);
-      let txInfoHashable = Object.assign({}, txInfo, { inputs, outputs });
+      let txForSig = Object.assign({}, txInfo, { inputs, outputs });
 
-      let txHex = Tx.createHashable(txInfoHashable, i, _sigHashType);
+      let txSigHash = Tx.createForSig(txForSig, i, _sigHashType);
+      let txHex = Tx.serialize(txSigHash, _sigHashType);
       let txBytes = Tx.utils.hexToBytes(txHex);
       let txHashBuf = await Tx.doubleSha256(txBytes);
       let privKey = await keyUtils.getPrivateKey(txInput, i, txInfo.inputs);
@@ -360,24 +361,22 @@ var DashTx = ("object" === typeof module && exports) || {};
       }
 
       /** @type TxInputSigned */
-      let txInputSigned = {
-        txid: txInput.txId || txInput.txid,
-        txId: txInput.txId || txInput.txid,
-        outputIndex: txInput.outputIndex,
-        signature: sigHex,
-        publicKey: pubKeyHex,
-        sigHashType: _sigHashType,
-      };
-
-      // expose _actual_ values used, for debugging
-      let txHashHex = Tx.utils.bytesToHex(txHashBuf);
-      Object.assign(txInputSigned, {
-        _hash: txHashHex,
-        _signature: sigHex.toString(),
-        _lockScript: txInfo.inputs[i].script,
-        _publicKey: pubKeyHex,
-        _sigHashType: _sigHashType,
-      });
+      let txInputSigned = Object.assign(
+        {
+          _transaction: txHex,
+          _hash: Tx.utils.bytesToHex(txHashBuf),
+          _lockScript: txForSig.inputs[i].script,
+        },
+        txInput,
+        {
+          txid: txInput.txId || txInput.txid,
+          txId: txInput.txId || txInput.txid,
+          outputIndex: txInput.outputIndex,
+          signature: sigHex,
+          publicKey: pubKeyHex,
+          sigHashType: _sigHashType,
+        },
+      );
 
       return txInputSigned;
     };
@@ -1029,8 +1028,7 @@ var DashTx = ("object" === typeof module && exports) || {};
       txInfoRaw.inputs.push(rawInput);
     }
 
-    let hex = Tx.serialize(txInfoRaw);
-    return hex;
+    return txInfoRaw;
   };
 
   // TODO createRequestInput
@@ -1044,27 +1042,26 @@ var DashTx = ("object" === typeof module && exports) || {};
     return rawInput;
   };
 
-  Tx.createHashable = function (txInfo, inputIndex, sigHashType) {
-    let txInfoHashable = Object.assign({}, txInfo);
+  Tx.createForSig = function (txInfo, inputIndex, sigHashType) {
+    let txForSig = Object.assign({}, txInfo);
 
-    /** @type {Array<TxInputRaw|TxInputHashable>} */
-    txInfoHashable.inputs = [];
+    /** @type {Array<TxInputRaw|TxInputForSig>} */
+    txForSig.inputs = [];
     for (let i = 0; i < txInfo.inputs.length; i += 1) {
       let input = txInfo.inputs[i];
       if (inputIndex === i) {
         let sighashInput = Tx.createInputForSig(input, i);
-        txInfoHashable.inputs.push(sighashInput);
+        txForSig.inputs.push(sighashInput);
         continue;
       }
 
       if (!(sigHashType & Tx.SIGHASH_ANYONECANPAY)) {
         let rawInput = Tx.createInputRaw(input, i);
-        txInfoHashable.inputs.push(rawInput);
+        txForSig.inputs.push(rawInput);
       }
     }
 
-    let txHex = Tx.serialize(txInfoHashable, sigHashType);
-    return txHex;
+    return txForSig;
   };
 
   Tx.createInputForSig = function (input, i) {
@@ -1085,11 +1082,6 @@ var DashTx = ("object" === typeof module && exports) || {};
       sigHashType: input.sigHashType,
       script: lockScript,
     };
-  };
-
-  Tx.createSigned = function (opts) {
-    let hex = Tx.serialize(opts);
-    return hex;
   };
 
   Tx.serialize = function (
@@ -1468,7 +1460,7 @@ var DashTx = ("object" === typeof module && exports) || {};
       if (0 === input.scriptSize) {
         // "Raw" Tx
       } else if (25 === input.scriptSize) {
-        // "Hashable" Tx
+        // "SigHash" Tx
         tx.hasInputScript = true;
 
         input.script = hex.substr(tx.offset, 2 * input.scriptSize);
@@ -1889,7 +1881,7 @@ if ("object" === typeof module) {
 
 /**
  * @typedef TxInfo
- * @prop {Array<TxInputHashable>} inputs
+ * @prop {Array<TxInputForSig>} inputs
  * @prop {Uint32} [locktime] - 0 by default
  * @prop {Array<TxOutput>} outputs
  * @prop {Uint32} [version]
@@ -1942,7 +1934,7 @@ if ("object" === typeof module) {
  */
 
 /**
- * @typedef TxInputHashable
+ * @typedef TxInputForSig
  * @prop {String} [address] - BaseCheck58-encoded pubKeyHash
  * @prop {String} [txId] - (deprecated) see .txid
  * @prop {String} txid - hex (not pre-reversed)
@@ -2048,16 +2040,15 @@ if ("object" === typeof module) {
  */
 
 /**
- * @callback TxCreateHashable
+ * @callback TxCreateForSig
  * @param {TxInfo} txInfo
  * @param {Uint32} inputIndex - create hashable tx for this input
  * @param {Uint32} sigHashType - 0x01 for ALL, or 0x81 for ALL + ANYONECANPAY
- * @returns {String} - hashable tx hex
  */
 
 /**
  * @callback TxCreateInputForSig
- * @param {TxInputHashable} input
+ * @param {TxInputForSig} input
  * @param {Uint32} inputIndex - create hashable tx for this input
  */
 
@@ -2068,7 +2059,6 @@ if ("object" === typeof module) {
  * @param {Array<TxOutput>} opts.outputs
  * @param {Uint32} [opts.version]
  * @param {Boolean} [opts._debug] - bespoke debug output
- * @returns {String} - raw tx hex
  */
 
 /**
@@ -2095,17 +2085,17 @@ if ("object" === typeof module) {
 
 /**
  * @callback TxGetPrivateKey
- * @param {TxInputHashable} txInput
+ * @param {TxInputForSig} txInput
  * @param {Uint53} i
- * @param {Array<TxInputRaw|TxInputHashable>} txInputs
+ * @param {Array<TxInputRaw|TxInputForSig>} txInputs
  * @returns {Promise<TxPrivateKey>} - private key Uint8Array
  */
 
 /**
  * @callback TxGetPublicKey
- * @param {TxInputHashable} txInput
+ * @param {TxInputForSig} txInput
  * @param {Uint53} i
- * @param {Array<TxInputRaw|TxInputHashable>} txInputs
+ * @param {Array<TxInputRaw|TxInputForSig>} txInputs
  * @returns {Promise<TxPublicKey>} - public key Uint8Array
  */
 
@@ -2149,7 +2139,7 @@ if ("object" === typeof module) {
  */
 
 /**
- * @callback TxParseHashable
+ * @callback TxParseSigHash
  * @param {Hex} hex - a ready-to-sign tx with input script and trailing sighash byte
  * @returns {TxInfo}
  */
@@ -2189,7 +2179,7 @@ if ("object" === typeof module) {
 /**
  * @callback TxSerialize
  * @param {Object} txInfo
- * @param {Array<TxInputRaw|TxInputHashable|TxInputSigned>} txInfo.inputs
+ * @param {Array<TxInputRaw|TxInputForSig|TxInputSigned>} txInfo.inputs
  * @param {Uint32} [txInfo.locktime]
  * @param {Array<TxOutput>} txInfo.outputs
  * @param {Uint32} [txInfo.version]
@@ -2199,7 +2189,7 @@ if ("object" === typeof module) {
 
 /**
  * @callback TxSerializeInputs
- * @param {Array<TxInput|TxInputRaw|TxInputHashable|TxInputSigned>} txInputs
+ * @param {Array<TxInput|TxInputRaw|TxInputForSig|TxInputSigned>} txInputs
  * @param {Object} [_opts]
  * @param {Array<String>} [_opts._tx]
  * @param {String} [_opts._sep]
@@ -2207,7 +2197,7 @@ if ("object" === typeof module) {
 
 /**
  * @callback TxSerializeInput
- * @param {TxInput|TxInputRaw|TxInputHashable|TxInputSigned} txInput
+ * @param {TxInput|TxInputRaw|TxInputForSig|TxInputSigned} txInput
  * @param {Uint32} i
  * @param {Object} [_opts]
  * @param {Array<String>} [_opts._tx]

@@ -209,17 +209,17 @@ async function main() {
   console.log(privKey);
   //console.log("pk", Tx.utils.bytesToHex(privKey));
 
-  /** @typedef {import('./tx.js').TxInputHashable} TxInputHashable */
+  /** @typedef {import('./tx.js').TxInputForSig} TxInputForSig */
   /** @typedef {import('./tx.js').TxInputSigned} TxInputSigned */
   let dashSignedTxIn = {
-    /** @type {Array<TxInputHashable|TxInputSigned>} */
+    /** @type {Array<TxInputForSig|TxInputSigned>} */
     inputs: [],
     outputs: dashSignableTxIn.outputs,
   };
 
   for (let i = 0; i < dashSignableTxIn.inputs.length; i += 1) {
     let txIn = dashSignableTxIn.inputs[i];
-    // TODO hashbufs go on TxInputHashable?
+    // TODO hashbufs go on TxInputForSig?
     let dashTxHashBuf = dashTxHashBufs[i];
 
     let sig = await Secp256k1.sign(dashTxHashBuf, privKey, { canonical: true });

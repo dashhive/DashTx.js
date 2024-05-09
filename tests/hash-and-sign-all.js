@@ -2,7 +2,7 @@
 
 let Zora = require("zora");
 
-/** @typedef {import('../dashtx.js').TxInputHashable} TxInputHashable */
+/** @typedef {import('../dashtx.js').TxInputSigHash} TxInputSigHash */
 /** @typedef {import('../dashtx.js').TxInputSigned} TxInputSigned */
 let Tx = require("../dashtx.js");
 
