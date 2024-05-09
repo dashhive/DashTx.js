@@ -23,8 +23,8 @@
  * @prop {TxCreateInputForSig} createInputForSig
  * @prop {TxCreateSigned} createSigned
  * @prop {TxGetId} getId - only useful for fully signed tx
- * @prop {TxHashPartial} hashPartial - useful for computing sigs
  * @prop {TxCreateLegacyTx} createLegacyTx
+ * @prop {TxDoubleSha256} doubleSha256
  * @prop {TxParseUnknown} parseUnknown
  * @prop {TxParseRequest} parseRequest
  * @prop {TxParseHashable} parseHashable
@@ -39,7 +39,6 @@
  * @prop {Function} _createInsufficientFundsError
  * @prop {Function} _createMemoScript
  * @prop {Function} _debugPrint
- * @prop {Function} _hash
  * @prop {Function} _legacyMustSelectInputs
  * @prop {Function} _legacySelectOptimalUtxos
  * @prop {Function} _packInputs
@@ -306,8 +305,9 @@ var DashTx = ("object" === typeof module && exports) || {};
         // TODO script -> lockScript, sigScript
         //let lockScriptHex = txInput.script;
         let _sigHashType = txInput.sigHashType ?? Tx.SIGHASH_ALL;
-        let txHashable = Tx.createHashable(txInfo, i, _sigHashType);
-        let txHashBuf = await Tx.hashPartial(txHashable, 0x00);
+        let txHex = Tx.createHashable(txInfo, i, _sigHashType);
+        let txBytes = Tx.utils.hexToBytes(txHex);
+        let txHashBuf = await Tx.doubleSha256(txBytes);
         let privKey = await keyUtils.getPrivateKey(txInput, i, txInfo.inputs);
 
         let sigBuf = await keyUtils.sign(privKey, txHashBuf);
@@ -1340,7 +1340,7 @@ var DashTx = ("object" === typeof module && exports) || {};
     //console.log("Broadcastable Tx Buffer");
     //console.log(u8);
 
-    let hashU8 = await Tx._hash(u8);
+    let hashU8 = await Tx.doubleSha256(u8);
 
     let reverseU8 = new Uint8Array(hashU8.length);
     let reverseIndex = reverseU8.length - 1;
@@ -1359,27 +1359,12 @@ var DashTx = ("object" === typeof module && exports) || {};
     return id;
   };
 
-  Tx.hashPartial = async function (txHex, sigHashType = Tx.SIGHASH_ALL) {
-    let txSignable = txHex;
-    if (sigHashType) {
-      let sigHashTypeHex = TxUtils._toUint32LE(sigHashType);
-      txSignable = `${txSignable}${sigHashTypeHex}`;
-    }
-
-    let u8 = Tx.utils.hexToBytes(txSignable);
-    //console.log("Signable Tx Buffer");
-    //console.log(u8);
-
-    let hashU8 = await Tx._hash(u8);
-    return hashU8;
-  };
-
   /**
-   * @param {Uint8Array} u8
+   * @param {Uint8Array} bytes
    * @returns {Promise<Uint8Array>} - the reversed double-sha256sum
    */
-  Tx._hash = async function (u8) {
-    let ab = await Crypto.subtle.digest({ name: "SHA-256" }, u8);
+  Tx.doubleSha256 = async function (bytes) {
+    let ab = await Crypto.subtle.digest({ name: "SHA-256" }, bytes);
     //console.log("Round 1 Hash Buffer");
     //console.log(ab);
 
@@ -2112,9 +2097,8 @@ if ("object" === typeof module) {
  */
 
 /**
- * @callback TxHashPartial
- * @param {String} txHex - signable tx hex (like raw tx, but with (lock)script)
- * @param {Uint32} [sigHashType] - typically 0x01 (SIGHASH_ALL) for signable
+ * @callback TxDoubleSha256
+ * @param {Uint8Array} txBytes - signable tx bytes (like raw tx, but with (lock)script)
  * @returns {Promise<Uint8Array>}
  */
 
