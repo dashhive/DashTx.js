@@ -9,6 +9,8 @@
  * @prop {Uint32} MAX_INPUT_SIZE - 149 each (with padding)
  * @prop {Uint32} OUTPUT_SIZE - 34 each
  * @prop {Uint32|0x00000001} SIGHASH_ALL - 0x01
+ * @prop {Uint32|0x00000002} SIGHASH_NONE - 0x02
+ * @prop {Uint32|0x00000003} SIGHASH_SINGLE - 0x03 - Not Supported
  * @prop {Uint32|0x00000080} SIGHASH_ANYONECANPAY - 0x80
  * @prop {TxAppraise} appraise
  * @prop {TxAppraiseCounts} _appraiseCounts
@@ -29,6 +31,8 @@
  * @prop {TxParseRequest} parseRequest
  * @prop {TxParseHashable} parseHashable
  * @prop {TxParseSigned} parseSigned
+ * @prop {TxSelectSigHashInputs} selectSigHashInputs
+ * @prop {TxSelectSigHashOutputs} selectSigHashOutputs
  * @prop {TxSortBySats} sortBySatsAsc
  * @prop {TxSortBySats} sortBySatsDsc
  * @prop {TxSortInputs} sortInputs
@@ -164,6 +168,8 @@ var DashTx = ("object" === typeof module && exports) || {};
     25; // lockscript
 
   Tx.SIGHASH_ALL = 0x01;
+  Tx.SIGHASH_NONE = 0x02;
+  Tx.SIGHASH_SINGLE = 0x03; // Not Supported
   Tx.SIGHASH_ANYONECANPAY = 0x80;
 
   Tx.appraise = function (txInfo) {
@@ -320,7 +326,12 @@ var DashTx = ("object" === typeof module && exports) || {};
       let txInput = txInfo.inputs[i];
 
       let _sigHashType = txInput.sigHashType ?? sigHashType ?? Tx.SIGHASH_ALL;
-      let txHex = Tx.createHashable(txInfo, i, _sigHashType);
+
+      let inputs = Tx.selectSigHashInputs(txInfo, i, _sigHashType);
+      let outputs = Tx.selectSigHashOutputs(txInfo, i, _sigHashType);
+      let txInfoHashable = Object.assign({}, txInfo, { inputs, outputs });
+
+      let txHex = Tx.createHashable(txInfoHashable, i, _sigHashType);
       let txBytes = Tx.utils.hexToBytes(txHex);
       let txHashBuf = await Tx.doubleSha256(txBytes);
       let privKey = await keyUtils.getPrivateKey(txInput, i, txInfo.inputs);
@@ -603,6 +614,41 @@ var DashTx = ("object" === typeof module && exports) || {};
     };
 
     return txInst;
+  };
+
+  Tx.selectSigHashInputs = function (txInfo, i, sigHashType = Tx.SIGHASH_ALL) {
+    let inputs = txInfo.inputs; // default (not Tx.SIGHASH_ANYONECANPAY)
+
+    if (sigHashType & Tx.SIGHASH_ANYONECANPAY) {
+      let txInput = txInfo.inputs[i];
+      inputs = [txInput];
+    }
+
+    return inputs;
+  };
+
+  Tx.selectSigHashOutputs = function (txInfo, i, sigHashType = Tx.SIGHASH_ALL) {
+    let outputs = txInfo.outputs;
+    if (sigHashType & Tx.SIGHASH_ALL) {
+      return outputs;
+    }
+
+    if (sigHashType & Tx.SIGHASH_NONE) {
+      outputs = [];
+      return outputs;
+    }
+
+    if (sigHashType & Tx.SIGHASH_SINGLE) {
+      let output = txInfo.outputs[i];
+      outputs = [output];
+      throw new Error(
+        "SIGHASH_SINGLE conflicts with BIP-69, see https://github.com/dashhive/DashTx.js/issues/66",
+      );
+    }
+
+    throw new Error(
+      `expected SIGHASH_[ALL|NONE], but got unrecognized type: ${sigHashType}`,
+    );
   };
 
   /**
@@ -2161,6 +2207,20 @@ if ("object" === typeof module) {
  * @callback TxReverseHex
  * @param {String} hex
  * @returns {String} - hex pairs in reverse order
+ */
+
+/**
+ * @callback TxSelectSigHashInputs
+ * @param {TxInfo} txInfo
+ * @param {Uint32} i - index of input to be signed
+ * @param {Uint8} sighHashType
+ */
+
+/**
+ * @callback TxSelectSigHashOutputs
+ * @param {TxInfo} txInfo
+ * @param {Uint32} i - index of input to be signed
+ * @param {Uint8} sighHashType
  */
 
 /**
