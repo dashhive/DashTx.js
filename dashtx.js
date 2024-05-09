@@ -33,22 +33,22 @@
  * @prop {TxParseSigned} parseSigned
  * @prop {TxSelectSigHashInputs} selectSigHashInputs
  * @prop {TxSelectSigHashOutputs} selectSigHashOutputs
+ * @prop {TxSerialize} serialize
+ * @prop {TxSerializeInputs} serializeInputs
+ * @prop {TxSerializeInput} serializeInput
+ * @prop {TxSerializeOutputs} serializeOutputs
+ * @prop {TxSerializeOutput} serializeOutput
  * @prop {TxSortBySats} sortBySatsAsc
  * @prop {TxSortBySats} sortBySatsDsc
  * @prop {TxSortInputs} sortInputs
  * @prop {TxSortOutputs} sortOutputs
  * @prop {TxSum} sum - sums an array of TxInputUnspent
  * @prop {TxUtils} utils
- * @prop {Function} serialize
  * @prop {Function} _createInsufficientFundsError
  * @prop {Function} _createMemoScript
  * @prop {Function} _debugPrint
  * @prop {Function} _legacyMustSelectInputs
  * @prop {Function} _legacySelectOptimalUtxos
- * @prop {Function} _packInputs
- * @prop {Function} _packInput
- * @prop {Function} _packOutputs
- * @prop {Function} _packOutput
  * @prop {Function} _parse
  */
 
@@ -1092,15 +1092,6 @@ var DashTx = ("object" === typeof module && exports) || {};
     return hex;
   };
 
-  /**
-   * @param {Object} opts
-   * @param {Array<TxInputRaw|TxInputHashable|TxInputSigned>} opts.inputs
-   * @param {Uint32} [opts.locktime]
-   * @param {Array<TxOutput>} opts.outputs
-   * @param {Uint32} [opts.version]
-   * @param {Boolean} [opts._debug] - bespoke debug output
-   * @param {Uint32} [sigHashType]
-   */
   Tx.serialize = function (
     {
       version = CURRENT_VERSION,
@@ -1122,8 +1113,8 @@ var DashTx = ("object" === typeof module && exports) || {};
     let v = TxUtils._toUint32LE(version);
     tx.push(v);
 
-    void Tx._packInputs({ tx, inputs, _sep });
-    void Tx._packOutputs({ tx, outputs, _sep });
+    void Tx.serializeInputs(inputs, { _tx: tx, _sep: _sep });
+    void Tx.serializeOutputs(outputs, { _tx: tx, _sep: _sep });
 
     let locktimeHex = TxUtils._toUint32LE(locktime);
     tx.push(locktimeHex);
@@ -1138,21 +1129,16 @@ var DashTx = ("object" === typeof module && exports) || {};
     return txHex;
   };
 
-  /**
-   * Privately exported for use by DashJoin.js
-   * @param {Object} opts
-   * @param {Array<String>} opts.tx
-   * @param {Array<TxInputRaw|TxInputHashable|TxInputSigned>} opts.inputs
-   * @param {String} [opts._sep] - string to join hex segements ('' or '\n')
-   * @returns {Array<String>} - tx (original is modified if provided)
-   */
-  Tx._packInputs = function ({ tx = [], inputs, _sep = "" }) {
+  Tx.serializeInputs = function (inputs, _opts) {
+    let tx = _opts?._tx || [];
+    let _sep = _opts?._sep || "";
+
     let nInputs = Tx.utils.toVarInt(inputs.length);
     tx.push(nInputs);
 
     for (let i = 0; i < inputs.length; i += 1) {
       let input = inputs[i];
-      let inputHex = Tx._packInput(input, i, { _sep: _sep });
+      let inputHex = Tx.serializeInput(input, i, { _sep: _sep });
       let txIn = inputHex.join(_sep);
       tx.push(txIn);
     }
@@ -1160,17 +1146,8 @@ var DashTx = ("object" === typeof module && exports) || {};
     return tx;
   };
 
-  /**
-   * Privately exported for use by DashJoin.js
-   * @param {TxInputRaw|TxInputHashable|TxInputSigned} input
-   * @param {Uint32} i - input index
-   * @param {Object} opts
-   * @param {Array<String>} opts.tx
-   * @param {String} [opts._sep] - string to join hex segements ('' or '\n')
-   * @returns {Array<String>} - tx (original is modified if provided)
-   */
-  Tx._packInput = function (input, i, opts) {
-    let tx = opts?.tx || [];
+  Tx.serializeInput = function (input, i, _opts) {
+    let tx = _opts?._tx || [];
 
     if (!input.txid) {
       throw new Error("missing required utxo property 'txid'");
@@ -1234,15 +1211,10 @@ var DashTx = ("object" === typeof module && exports) || {};
     return tx;
   };
 
-  /**
-   * Privately exported for use by DashJoin.js
-   * @param {Object} opts
-   * @param {Array<String>} opts.tx
-   * @param {Array<TxOutput>} opts.outputs
-   * @param {String} [opts._sep] - string to join hex segements ('' or '\n')
-   * @returns {Array<String>} - tx (original is modified if provided)
-   */
-  Tx._packOutputs = function ({ tx = [], outputs, _sep = "" }) {
+  Tx.serializeOutputs = function (outputs, opts) {
+    let tx = opts?._tx || [];
+    let _sep = opts?._sep || "";
+
     if (!outputs.length) {
       throw new Error(E_NO_OUTPUTS);
     }
@@ -1252,7 +1224,7 @@ var DashTx = ("object" === typeof module && exports) || {};
 
     for (let i = 0; i < outputs.length; i += 1) {
       let output = outputs[i];
-      let outputHex = Tx._packOutput(output, { _sep });
+      let outputHex = Tx.serializeOutput(output, i, { _sep });
       let txOut = outputHex.join(_sep);
       tx.push(txOut);
     }
@@ -1260,18 +1232,9 @@ var DashTx = ("object" === typeof module && exports) || {};
     return tx;
   };
 
-  /**
-   * Privately exported for use by DashJoin.js
-   * @param {TxOutput} output
-   * @param {Uint32} i
-   * @param {Object} opts
-   * @param {Array<String>} opts.tx
-   * @param {String} [opts._sep] - string to join hex segements ('' or '\n')
-   * @returns {Array<String>} - tx (original is modified if provided)
-   */
-  Tx._packOutput = function (output, i, opts) {
-    let tx = opts?.tx || [];
-    let _sep = opts?._sep || "";
+  Tx.serializeOutput = function (output, i, _opts) {
+    let tx = _opts?._tx || [];
+    let _sep = _opts?._sep || "";
 
     if (output.message) {
       if (!output.memo) {
@@ -2221,6 +2184,51 @@ if ("object" === typeof module) {
  * @param {TxInfo} txInfo
  * @param {Uint32} i - index of input to be signed
  * @param {Uint8} sighHashType
+ */
+
+/**
+ * @callback TxSerialize
+ * @param {Object} txInfo
+ * @param {Array<TxInputRaw|TxInputHashable|TxInputSigned>} txInfo.inputs
+ * @param {Uint32} [txInfo.locktime]
+ * @param {Array<TxOutput>} txInfo.outputs
+ * @param {Uint32} [txInfo.version]
+ * @param {Boolean} [txInfo._debug] - bespoke debug output
+ * @param {Uint32} [sigHashType]
+ */
+
+/**
+ * @callback TxSerializeInputs
+ * @param {Array<TxInput|TxInputRaw|TxInputHashable|TxInputSigned>} txInputs
+ * @param {Object} [_opts]
+ * @param {Array<String>} [_opts._tx]
+ * @param {String} [_opts._sep]
+ */
+
+/**
+ * @callback TxSerializeInput
+ * @param {TxInput|TxInputRaw|TxInputHashable|TxInputSigned} txInput
+ * @param {Uint32} i
+ * @param {Object} [_opts]
+ * @param {Array<String>} [_opts._tx]
+ * @param {String} [_opts._sep]
+ */
+
+/**
+ * @callback TxSerializeOutputs
+ * @param {Array<TxOutput>} txOutputs
+ * @param {Object} [_opts]
+ * @param {Array<String>} [_opts._tx]
+ * @param {String} [_opts._sep]
+ */
+
+/**
+ * @callback TxSerializeOutput
+ * @param {TxOutput} txOutput
+ * @param {Uint32} i
+ * @param {Object} [_opts]
+ * @param {Array<String>} [_opts._tx]
+ * @param {String} [_opts._sep]
  */
 
 /**
