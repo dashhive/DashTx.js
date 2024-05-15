@@ -23,23 +23,23 @@ function unsort(sorted) {
 
 let inputsSorted = [
   {
-    txId: "00ff",
+    txid: "00ff",
     outputIndex: 0,
   },
   {
-    txId: "00ff",
+    txid: "00ff",
     outputIndex: 9,
   },
   {
-    txId: "aacc",
+    txid: "aacc",
     outputIndex: 5,
   },
   {
-    txId: "ff00",
+    txid: "ff00",
     outputIndex: 0,
   },
   {
-    txId: "ff00",
+    txid: "ff00",
     outputIndex: 9,
   },
 ];
@@ -159,9 +159,9 @@ Zora.test("outputs sort correctly", async function (t) {
 
 Zora.test("legacyCreateTx uses lex sort functions", async function (t) {
   let inputs = [
-    { satoshis: 40500, txId: "ff", outputIndex: 1 },
-    { satoshis: 20500, txId: "00", outputIndex: 2 },
-    { satoshis: 10500, txId: "ff", outputIndex: 0 },
+    { satoshis: 40500, txid: "ff", outputIndex: 1 },
+    { satoshis: 20500, txid: "00", outputIndex: 2 },
+    { satoshis: 10500, txid: "ff", outputIndex: 0 },
   ];
   let sortedIn = inputs.slice(0);
   sortedIn.sort(DashTx.sortInputs);

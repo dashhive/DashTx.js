@@ -15,7 +15,7 @@ let Secp256k1 = exports.nobleSecp256k1 || require("@dashincubator/secp256k1");
 let rawtx =
   "03000000022b35e8bd64852ae0277a7a4ab6d6293f477f27e859251d27a9a3ebcb5855307f000000006b48304502210098ba308087f7bcc5d9f6c347ffd633422bbbe8d44a20c21a2d5574da35d0a2070220026cae84cec2d96fd4e1a837ab0f3a559fdbd4b19bdd60c4dec450565f79f5f3012103e10848073f3f92f43d718ed1be39afe7314e410eb7080bbc4474e82fe88c5cf2ffffffff2b35e8bd64852ae0277a7a4ab6d6293f477f27e859251d27a9a3ebcb5855307f010000006b483045022100a6ec8b004c6e24047df4a9b2198a42c92862c4b3ad7ac989c85a04ba86fbdb3702200febea2871834d70c1c9d754cbe8163def8f1f721eb8b833098e01bd49ccae65012103e10848073f3f92f43d718ed1be39afe7314e410eb7080bbc4474e82fe88c5cf2ffffffff020a090000000000001976a9145bcd0d776a7252310b9f1a7eee1a749d4212694488ac0a090000000000001976a9145bcd0d776a7252310b9f1a7eee1a749d4212694488ac00000000";
 
-let txId = "7f305558cbeba3a9271d2559e8277f473f29d6b64a7a7a27e02a8564bde8352b";
+let txid = "7f305558cbeba3a9271d2559e8277f473f29d6b64a7a7a27e02a8564bde8352b";
 let prevLockScript = [
   "76", // OP_DUP
   "a9", // OP_HASH160
@@ -44,13 +44,13 @@ let txInfo = {
   version: 3,
   inputs: [
     {
-      txId: txId,
+      txid: txid,
       outputIndex: 0,
       script: prevLockScript,
       sigHashType: sigHashType,
     },
     {
-      txId: txId,
+      txid: txid,
       outputIndex: 1,
       script: prevLockScript,
       sigHashType: sigHashType,

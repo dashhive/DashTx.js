@@ -51,8 +51,8 @@ function genTestVals(name, sats, deterministic) {
       {
         address: "XgCLJNfaugnB35WTCMjKQ65GMBN41QtVQJ",
         satoshis: sats,
-        //txId: "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-        txId: "0123456789abcdeffedcba987654321000112233445566778899aabbccddeeff",
+        //txid: "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        txid: "0123456789abcdeffedcba987654321000112233445566778899aabbccddeeff",
         outputIndex: 0,
       },
     ],

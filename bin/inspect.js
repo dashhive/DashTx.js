@@ -164,8 +164,8 @@ DashTx._debugPrint = async function (tx) {
     lines.push(`TxID:   N/A`);
   } else if (tx.hasInputScript) {
     lines.push(`Tx Hash: N/A`);
-    let txId = await DashTx.getId(tx.transaction);
-    lines.push(`TxID: ${txId}`);
+    let txid = await DashTx.getId(tx.transaction);
+    lines.push(`TxID: ${txid}`);
     // lines.push(`TxID: 'await Tx.getId(txInfo.transaction)'`);
   } else {
     lines.push(`Tx Hash: N/A`);

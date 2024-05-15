@@ -87,9 +87,9 @@ Zora.test("memo lengths", function (t) {
 Zora.test("can create memo tx", async function (t) {
   let pkh = "82754a9c935fbfcdda5995a32006a68a8156ee2b";
 
-  let txId = "77".repeat(32);
+  let txid = "77".repeat(32);
   let coins = [
-    { pubKeyHash: pkh, satoshis: 20000, txId: txId, outputIndex: 0 },
+    { pubKeyHash: pkh, satoshis: 20000, txid: txid, outputIndex: 0 },
   ];
 
   /** @type {Array<DashTx.TxOutput>} */
@@ -116,12 +116,12 @@ Zora.test("can create memo tx", async function (t) {
 Zora.test("can create donation tx via memo", async function (t) {
   let pkh = "82754a9c935fbfcdda5995a32006a68a8156ee2b";
 
-  let txId = "77".repeat(32);
+  let txid = "77".repeat(32);
   let inputs = [
     {
       pubKeyHash: pkh,
       satoshis: 20000,
-      txId: txId,
+      txid: txid,
       outputIndex: 0,
       sigHashType: DashTx.SIGHASH_ALL,
     },

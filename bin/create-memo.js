@@ -49,13 +49,13 @@ async function main() {
 
   let coreUtxo = await require(coinpath);
   let valid =
-    coreUtxo.txId &&
+    coreUtxo.txid &&
     coreUtxo.outputIndex &&
     coreUtxo.satoshis &&
     (coreUtxo.address || coreUtxo.pubKeyHash || coreUtxo.script);
   if (!valid) {
     console.error(
-      "coin JSON must contain 'txId', 'outputIndex', 'satoshis' and one of 'address', 'pubKeyHash', or 'script'",
+      "coin JSON must contain 'txid', 'outputIndex', 'satoshis' and one of 'address', 'pubKeyHash', or 'script'",
     );
     process.exit(1);
     return;
