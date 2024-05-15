@@ -103,11 +103,13 @@ Zora.test("can create memo tx", async function (t) {
   let changeOutput = { pubKeyHash: pkh };
   let txInfo = await DashTx.legacyCreateTx(coins, outputs, changeOutput);
 
-  let txInfoSigned = await dashTx.hashAndSignAll(txInfo);
+  let txInfoSigned = await dashTx.hashAndSignAll(
+    txInfo,
+    DashTx.SIGHASH_ALL | DashTx.SIGHASH_ANYONECANPAY,
+  );
 
   let rawtx =
-    "03000000017777777777777777777777777777777777777777777777777777777777777777000000006b483045022100888db2ea9388e2c29d2480fd3374250cb2242a7dfa0e4bc6d82ac01b58f99dfb02200fe878c74f58eebf234f31a43a17bc6ea1535de6f7f2329ac007107888a39199012103f808bdec4293bf12441ec9a9e61bc3b264c78fcc5ad499ce5f0799f2874e6856ffffffff0200000000000000000e6a0c48656c6c6f2c204461736821484d0000000000001976a91482754a9c935fbfcdda5995a32006a68a8156ee2b88ac00000000";
-
+    "03000000017777777777777777777777777777777777777777777777777777777777777777000000006a47304402200ece01fcaedeb53b0983e333b07859957a816a62663b6f20439b3ed5e94794910220713eb04bc7ce7a3861ce3f46a8cfa8b308769bc114ed419a0e9c0bf8dbc4c4b4812103f808bdec4293bf12441ec9a9e61bc3b264c78fcc5ad499ce5f0799f2874e6856ffffffff0200000000000000000e6a0c48656c6c6f2c204461736821484d0000000000001976a91482754a9c935fbfcdda5995a32006a68a8156ee2b88ac00000000";
   t.equal(txInfoSigned.transaction, rawtx, "created transaction with memo");
 });
 
@@ -116,7 +118,13 @@ Zora.test("can create donation tx via memo", async function (t) {
 
   let txId = "77".repeat(32);
   let inputs = [
-    { pubKeyHash: pkh, satoshis: 20000, txId: txId, outputIndex: 0 },
+    {
+      pubKeyHash: pkh,
+      satoshis: 20000,
+      txId: txId,
+      outputIndex: 0,
+      sigHashType: DashTx.SIGHASH_ALL,
+    },
   ];
 
   //let donationOutput = Tx.createDonationOutput();
