@@ -195,7 +195,7 @@ let txInfo = {
   version: 3,
   inputs: [
     {
-      txId: "7f3055...e8352b",
+      txid: "7f3055...e8352b",
       outputIndex: 0,
       publicKey: "5bcd0d776a7252310b9f1a7eee1a749d42126944",
       sigHashType: 0x01,
@@ -242,7 +242,7 @@ let txInfo = {
   version: 3,
   inputs: [
     {
-      txId: "7f305558cbeba3a9271d2559e8277f473f29d6b64a7a7a27e02a8564bde8352b",
+      txid: "7f305558cbeba3a9271d2559e8277f473f29d6b64a7a7a27e02a8564bde8352b",
       outputIndex: 0,
       // "Xj4Ey1oerk5KUKM71UQCTUBbmfyQuoUHDr"
       // "5bcd0d776a7252310b9f1a7eee1a749d42126944"
@@ -291,7 +291,7 @@ insert a change output if necessary.
 let coins = [
   {
     satoshis: 1_000_00000,
-    txId: "7f305558cbeba3a9271d2559e8277f473f29d6b64a7a7a27e02a8564bde8352b",
+    txid: "7f305558cbeba3a9271d2559e8277f473f29d6b64a7a7a27e02a8564bde8352b",
     outputIndex: 0,
     // you may have one or more address identifiers
     publicKey:
@@ -336,7 +336,7 @@ console.info(txInfo.transaction);
 {
   "inputs": [
     {
-      "txId": "7f305558cbeba3a9271d2559e8277f473f29d6b64a7a7a27e02a8564bde8352b",
+      "txid": "7f305558cbeba3a9271d2559e8277f473f29d6b64a7a7a27e02a8564bde8352b",
       "outputIndex": 0,
       "publicKey": "03755be68d084e7ead4d83e23fb37c3076b16ead432de1b0bdf249290400f263cb",
       "sigHashType": 1,
@@ -623,7 +623,7 @@ Tx.create({ getPrivateKey, getPublicKey, sign, toPublicKey });
  * For example, you could store private keys in a map by their
  * corresponding address.
  *
- * @param {TxInput} txInput - publicKey, txId, outputIndex, etc
+ * @param {TxInput} txInput - publicKey, txid, outputIndex, etc
  * @param {Number} i - the index of the inputs array
  * @returns {Uint8Array} - the private key bytes
  */
