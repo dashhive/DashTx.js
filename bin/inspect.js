@@ -152,7 +152,9 @@ DashTx._debugPrint = async function (tx) {
     );
     lines.push("");
 
-    let txHash = await DashTx.hashPartial(tx.transaction, DashTx.SIGHASH_ALL);
+    let txHex = `${tx.transaction}${tx.sigHashTypeHex}`;
+    let txBytes = DashTx.utils.hexToBytes(txHex);
+    let txHash = await DashTx.doubleSha256(txBytes);
     let txHashHex = DashTx.utils.bytesToHex(txHash);
     // TODO 'N/A' if not applicable
     lines.push(`Tx Hash: ${txHashHex}`);
