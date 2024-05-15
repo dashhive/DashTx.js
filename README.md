@@ -38,7 +38,7 @@ let DashKeys = require("dashkeys");
 let DashTx = require("dashtx");
 let Secp256k1 = require("@dashincubator/secp256k1");
 
-let yourWalletKeyDataMapGoesHere = {
+let yourWalletKeyMapGoesHere = {
   /* SEE BELOW */
 };
 
@@ -79,7 +79,7 @@ Note: You must provide your own _Key Util_ functions, as shown below.
   let DashTx = window.DashKeys;
   let Secp256k1 = window.nobleSecp256k1;
 
-  let yourWalletKeyDataMapGoesHere = {
+  let yourWalletKeyMapGoesHere = {
     /* SEE BELOW */
   };
 
