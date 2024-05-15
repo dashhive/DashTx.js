@@ -12,6 +12,7 @@
  * @prop {Uint32|0x00000002} SIGHASH_NONE - 0x02
  * @prop {Uint32|0x00000003} SIGHASH_SINGLE - 0x03 - Not Supported
  * @prop {Uint32|0x00000080} SIGHASH_ANYONECANPAY - 0x80
+ * @prop {Uint32|0x00000081} SIGHASH_DEFAULT - 0x81
  * @prop {TxAppraise} appraise
  * @prop {TxAppraiseCounts} _appraiseCounts
  * @prop {TxAppraiseMemos} _appraiseMemos
@@ -173,6 +174,7 @@ var DashTx = ("object" === typeof module && exports) || {};
   Tx.SIGHASH_NONE = 0x02;
   Tx.SIGHASH_SINGLE = 0x03; // Not Supported
   Tx.SIGHASH_ANYONECANPAY = 0x80;
+  Tx.SIGHASH_DEFAULT = Tx.SIGHASH_ALL | Tx.SIGHASH_ANYONECANPAY;
 
   Tx.appraise = function (txInfo) {
     let extraSize = Tx._appraiseMemos(txInfo.outputs);
@@ -343,7 +345,8 @@ var DashTx = ("object" === typeof module && exports) || {};
     ) {
       let txInput = txInfo.inputs[i];
 
-      let _sigHashType = txInput.sigHashType ?? sigHashType ?? Tx.SIGHASH_ALL;
+      let _sigHashType =
+        txInput.sigHashType ?? sigHashType ?? Tx.SIGHASH_DEFAULT;
 
       // let inputs = Tx.selectSigHashInputs(txInfo, i, _sigHashType);
       // let outputs = Tx.selectSigHashOutputs(txInfo, i, _sigHashType);
@@ -635,8 +638,12 @@ var DashTx = ("object" === typeof module && exports) || {};
     return txInst;
   };
 
-  Tx.selectSigHashInputs = function (txInfo, i, sigHashType = Tx.SIGHASH_ALL) {
-    let inputs = txInfo.inputs; // default (not Tx.SIGHASH_ANYONECANPAY)
+  Tx.selectSigHashInputs = function (
+    txInfo,
+    i,
+    sigHashType = Tx.SIGHASH_DEFAULT,
+  ) {
+    let inputs = txInfo.inputs;
 
     if (sigHashType & Tx.SIGHASH_ANYONECANPAY) {
       let txInput = txInfo.inputs[i];
@@ -646,7 +653,11 @@ var DashTx = ("object" === typeof module && exports) || {};
     return inputs;
   };
 
-  Tx.selectSigHashOutputs = function (txInfo, i, sigHashType = Tx.SIGHASH_ALL) {
+  Tx.selectSigHashOutputs = function (
+    txInfo,
+    i,
+    sigHashType = Tx.SIGHASH_DEFAULT,
+  ) {
     let outputs = txInfo.outputs;
     if (sigHashType & Tx.SIGHASH_ALL) {
       return outputs;
@@ -1954,7 +1965,7 @@ if ("object" === typeof module) {
  * @prop {String} [script] - the previous lock script (default: derived from public key as p2pkh)
  * @prop {String} publicKey - hex-encoded public key (typically starts with a 0x02 or 0x03 prefix)
  * @prop {String} [pubKeyHash] - the 20-byte pubKeyHash (address without magic byte or checksum)
- * @prop {Uint32} sigHashType - typically 0x01 (SIGHASH_ALL)
+ * @prop {Uint32} sigHashType - typically 0x81 (SIGHASH_ALL|SIGHASH_ANYONECANPAY)
  */
 
 /**
@@ -1968,7 +1979,7 @@ if ("object" === typeof module) {
  * @prop {String} [script] - the previous lock script (default: derived from public key as p2pkh)
  * @prop {String} [publicKey] - hex-encoded public key (typically starts with a 0x02 or 0x03 prefix)
  * @prop {String} [pubKeyHash] - the 20-byte pubKeyHash (address without magic byte or checksum)
- * @prop {Uint32} [sigHashType] - typically 0x01 (SIGHASH_ALL)
+ * @prop {Uint32} sigHashType - typically 0x81 (SIGHASH_ALL|SIGHASH_ANYONECANPAY)
  */
 
 /**

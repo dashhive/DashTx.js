@@ -407,6 +407,7 @@ Tx.utils.strToHex(str);
 Tx.SIGHASH_ALL // 0x01
 Tx.SIGHASH_NONE // 0x02
 Tx.SIGHASH_ANYONECANPAY // 0x80
+Tx.SIGHASH_DEFAULT // 0x81 (ALL + ANYONECANPAY)
 
 Tx.createRaw(txRequestInfo);
 Tx.createForSig(txInfo, inputIndex, sigHashType);
