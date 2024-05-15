@@ -27,7 +27,7 @@ module.exports = require("./dashtx.js");
  * @typedef {import('./dashtx.js').TxSummary} TxSummary
  * @typedef {import('./dashtx.js').TxSummaryPartial} TxSummaryPartial
  * @typedef {import('./dashtx.js').TxInput} TxInput
- * @typedef {import('./dashtx.js').TxInputHashable} TxInputHashable
+ * @typedef {import('./dashtx.js').TxInputForSig} TxInputForSig
  * @typedef {import('./dashtx.js').TxInputRaw} TxInputRaw
  * @typedef {import('./dashtx.js').TxInputUnspent} TxInputUnspent
  * @typedef {import('./dashtx.js').TxInputSortable} TxInputSortable
