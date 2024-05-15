@@ -34,6 +34,7 @@
  * @prop {TxSelectSigHashInputs} selectSigHashInputs
  * @prop {TxSelectSigHashOutputs} selectSigHashOutputs
  * @prop {TxSerialize} serialize
+ * @prop {TxSerializeForSig} serializeForSig
  * @prop {TxSerializeInputs} serializeInputs
  * @prop {TxSerializeInput} serializeInput
  * @prop {TxSerializeOutputs} serializeOutputs
@@ -424,6 +425,7 @@ var DashTx = ("object" === typeof module && exports) || {};
       }
 
       let totalAvailable = DashTx.sum(inputs);
+      //@ts-ignore - TODO update typedefs
       let fees = DashTx.appraise({ inputs: inputs, outputs: [output] });
 
       //let EXTRA_SIG_BYTES_PER_INPUT = 2;
@@ -471,6 +473,7 @@ var DashTx = ("object" === typeof module && exports) || {};
         fullTransfer,
       };
 
+      //@ts-ignore - TODO update typedefs
       return txInfoRaw;
     };
 
@@ -672,6 +675,7 @@ var DashTx = ("object" === typeof module && exports) || {};
    * the smallest coin that is bigger or equal to the amount sent + fees,
    * or the largest available coins until that total is met.
    */
+  //@ts-ignore - TODO update typedefs
   Tx.createLegacyTx = async function (coins, outputs, changeOutput) {
     // TODO bump to 4 for DIP: enforce tx hygiene
     let version = CURRENT_VERSION;
@@ -686,6 +690,7 @@ var DashTx = ("object" === typeof module && exports) || {};
 
     /** @type {Array<TxInputUnspent>} */
     let inputs = [];
+    //@ts-ignore - TODO update typedefs
     let fees = DashTx.appraise({ inputs, outputs });
     let taxes = fees.max;
     // requires at least one input
@@ -1137,6 +1142,8 @@ var DashTx = ("object" === typeof module && exports) || {};
 
     return txHex;
   };
+  //@ts-ignore - same function, but typed and documented separately for clarity
+  Tx.serializeForSig = Tx.serialize;
 
   Tx.serializeInputs = function (inputs, _opts) {
     let tx = _opts?._tx || [];
@@ -2203,6 +2210,17 @@ if ("object" === typeof module) {
  * @param {Uint32} [txInfo.version]
  * @param {Boolean} [txInfo._debug] - bespoke debug output
  * @param {Uint32} [sigHashType]
+ */
+
+/**
+ * @callback TxSerializeForSig
+ * @param {Object} txInfo
+ * @param {Array<TxInputRaw|TxInputForSig>} txInfo.inputs
+ * @param {Uint32} [txInfo.locktime]
+ * @param {Array<TxOutput>} txInfo.outputs
+ * @param {Uint32} [txInfo.version]
+ * @param {Boolean} [txInfo._debug] - bespoke debug output
+ * @param {Uint32} sigHashType
  */
 
 /**

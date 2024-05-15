@@ -385,13 +385,15 @@ Tx.OUTPUT_SIZE         //          34
 ```text
 Tx.create({ getPrivateKey, getPublicKey, sign, toPublicKey });
     tx.hashAndSignAll(txInfo);
+    tx.hashAndSignInput(privBytes, txInfo, i, sigHashType);
     tx.legacy.draftSingleOutput({ utxos, inputs, output });
     tx.legacy.finalizePresorted(txDraft, keys);
 
 Tx.createDonationOutput();
 
 Tx.appraise({ inputs, outputs });
-Tx.getId(txHex);
+
+Tx.parseUnknown(serializedHex);
 
 // Byte-level helpers
 Tx.utils.toVarInt(n);
@@ -402,10 +404,28 @@ Tx.utils.hexToBytes(hex);
 Tx.utils.strToHex(str);
 
 // Low-level helpers
-Tx.createRaw(txInfoMinimal);
-Tx.createHashable(txInfo, inputIndex);
+Tx.SIGHASH_ALL // 0x01
+Tx.SIGHASH_NONE // 0x02
+Tx.SIGHASH_ANYONECANPAY // 0x80
+
+Tx.createRaw(txRequestInfo);
+Tx.createForSig(txInfo, inputIndex, sigHashType);
 Tx.createSigned(txInfoSigned);
-Tx.hashPartial(txHex, Tx.SIGHASH_ALL);
+
+Tx.serialize(txRequestOrTxSigned);
+Tx.serializeForSig(txInfo, sigHashType);
+
+Tx.createInputRaw(input, i);
+Tx.createInputForSig(input, i);
+
+Tx.serializeInputs(inputs);
+Tx.serializeOutputs(outputs, opts);
+
+Tx.serializeInput(input, i);
+Tx.serializeOutput(output, i);
+
+Tx.sum(coins);
+Tx.doubleSha256(txBytes) {
 
 // Deprecated
 Tx.createLegacyTx(coins, outputs, changeOutput);
@@ -415,7 +435,7 @@ Tx.createLegacyTx(coins, outputs, changeOutput);
 /**
  * Creates a tx signer instance.
  */
-Tx.create({ getPrivateKey, getPublicKey, sign, toPublicKey });
+Tx.create(keyUtils);
 
 /**
  * Estimates the min, mid, and max sizes of (fees for) a transaction (including memos).
@@ -488,9 +508,10 @@ Tx.createLegacyTx(coins, outputs, changeOutput);
 }
 
 /**
- * Creates an "null" transaction with minimal information.
- * It which CANNOT be used for hashing or signing... and
- * we're not sure what it is useful for. Seemingly nothing.
+ * Creates a transaction request object with minimal information.
+ * It CANNOT be used for hashing or signing. Useful for sharing
+ * between wallets as a request to create a shared transaction.
+ * (i.e. for CoinJoin)
  *
  * Note: although these basically encode enough information
  * for a payment request, there are better ways to do that.
@@ -498,21 +519,35 @@ Tx.createLegacyTx(coins, outputs, changeOutput);
 Tx.createRaw(txInfoMinimal);
 
 /**
- * Creates a transaction with all inputs "null"ed out,
- * except for the one corresponding to the given input index.
+ * Creates a transaction object with all inputs omitted
+ * (SIGHASH_ANYONECANPAY), or "null"ed out, except for the one
+ * corresponding to the given input index. That index will
+ * contain the lockscript from its previous output.
  *
  * This creates a one-off copy of the transaction suitable for
  * hashing to create the signature that will be inserted into
  * the (unrelated) final transaction.
  */
-Tx.createHashable(txInfo, inputIndex);
+Tx.createForSig(txInfo, inputIndex);
 
 /**
  * Creates a transaction that is ready to broadcast to the
- * network. It contains signatures from the one-off emphemeral,
- * hashable transactions created for each input.
+ * network.  Each input contains signatures from the one-off
+ * emphemeral, ready-to-sign transactions described above.
  */
 Tx.createSigned(txInfoSigned);
+
+/**
+ * Creates a transaction hex either for a raw request, or
+ * that is signed and ready to broadcast to the network.
+ */
+Tx.serialize(txInfo);
+
+/**
+ * Serialized a transaction as hex, appending the sigHashType
+ * of the target input, which is required for signing.
+ */
+Tx.serializeForSig(txInfo, sigHashType);
 
 /**
  * Double sha256 hashes the signed, broadcastable transaction
@@ -526,7 +561,14 @@ Tx.getId(txHex);
  * order because we use a standard ECSDA signing function that
  * expects bytes in the normal order.
  */
-Tx.hashPartial(txHex, Tx.SIGHASH_ALL);
+Tx.doubleSha256(txBytes);
+
+/**
+ * Parse a transaction hex, which may be a raw request will "null"-ed
+ * inputs, a ready-to-sign transaction with lockscript inputs, or a
+ * ready-to-broadcast transaction with signed inputs.
+ */
+Tx.parseUnknown(serializedHex);
 ```
 
 ### Utility Functions
