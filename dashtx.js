@@ -250,7 +250,7 @@ var DashTx = ("object" === typeof module && exports) || {};
   };
 
   Tx.create = function (keyUtils) {
-    if (!keyUtils.getPrivateKey) {
+    if (!keyUtils?.getPrivateKey) {
       throw new Error(`you must create with 'opts.getPrivateKey()'`);
     }
 
