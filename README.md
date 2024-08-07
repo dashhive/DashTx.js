@@ -162,7 +162,7 @@ let keyUtils = {
   },
 
   getPublicKey: async function (txInput, i) {
-    let privKeyBytes = getPrivateKey(txInput, i);
+    let privKeyBytes = await keyUtils.getPrivateKey(txInput, i);
     let pubKeyBytes = await keyUtils.toPublicKey(privKeyBytes);
 
     return pubKeyBytes;
