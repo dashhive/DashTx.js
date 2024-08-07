@@ -35,6 +35,8 @@ Zora.test("memo lengths", function (t) {
   let memo77 = "cc".repeat(77);
   let memo80 = "bb".repeat(80);
   let memo81 = "aa".repeat(81);
+  let memoProposal =
+    "2f3dbf4094c26594c7cd4b1c3d0af3740181d7e57f9f4faf5b7edbf6eddf4954";
 
   let size1 = "01";
   let size3 = "03";
@@ -47,41 +49,47 @@ Zora.test("memo lengths", function (t) {
   //let size81 = "51";
   //let size82 = "52";
   let size83 = "53";
+  let sizeProposal = "20";
 
   let OP_PD1 = "4c";
 
   t.throws(
     function () {
-      DashTx._createMemoScript(memo81);
+      DashTx._createMemoScript(memo81, 0);
     },
     /\b80 bytes\b/,
     "memo > 80 bytes should throw an error",
   );
 
-  let tx1 = DashTx._createMemoScript(memo1);
+  let tx1 = DashTx._createMemoScript(memo1, 0);
   let tx1a = `0000000000000000${size3}6a${size1}${memo1}`;
   let tx1b = tx1.join("");
   t.deepEqual(tx1b, tx1a, "single-byte memo fits");
 
-  let tx75 = DashTx._createMemoScript(memo75);
+  let tx75 = DashTx._createMemoScript(memo75, 0);
   let tx75a = `0000000000000000${size77}6a${size75}${memo75}`;
   let tx75b = tx75.join("");
   t.deepEqual(tx75b, tx75a, "75-byte memo fits");
 
   let tx76a = `0000000000000000${size79}6a${OP_PD1}${size76}${memo76}`;
-  let tx76 = DashTx._createMemoScript(memo76);
+  let tx76 = DashTx._createMemoScript(memo76, 0);
   let tx76b = tx76.join("");
   t.deepEqual(tx76b, tx76a, "76-byte memo fits with OP_PUSHDATA1");
 
   let tx77a = `0000000000000000${size80}6a${OP_PD1}${size77}${memo77}`;
-  let tx77 = DashTx._createMemoScript(memo77);
+  let tx77 = DashTx._createMemoScript(memo77, 0);
   let tx77b = tx77.join("");
   t.deepEqual(tx77b, tx77a, "77-byte memo fits with OP_PUSHDATA1");
 
   let tx80a = `0000000000000000${size83}6a${OP_PD1}${size80}${memo80}`;
-  let tx80 = DashTx._createMemoScript(memo80);
+  let tx80 = DashTx._createMemoScript(memo80, 0);
   let tx80b = tx80.join("");
   t.deepEqual(tx80b, tx80a, "80-byte memo fits with OP_PUSHDATA1");
+
+  let txProposalA = `00e1f50500000000226a202f3dbf4094c26594c7cd4b1c3d0af3740181d7e57f9f4faf5b7edbf6eddf4954`;
+  let txProposal = DashTx._createMemoScript(memoProposal, 100000000);
+  let txProposalB = txProposal.join("");
+  t.deepEqual(txProposalB, txProposalA, "32-byte memo fits with OP_PUSHDATA1");
 });
 
 Zora.test("can create memo tx", async function (t) {
