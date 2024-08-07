@@ -1269,14 +1269,13 @@ var DashTx = ("object" === typeof module && exports) || {};
       }
     }
     if (output.memo) {
-      let invalid = output.satoshis || output.address || output.pubKeyHash;
+      let invalid = output.address || output.pubKeyHash;
       if (invalid) {
-        throw new Error(
-          `memo outputs must not have 'satoshis', 'address', or 'pubKeyHash'`,
-        );
+        throw new Error(`memo outputs must not have 'address' or 'pubKeyHash'`);
       }
 
-      let memoScriptHex = Tx._createMemoScript(output.memo, i);
+      let sats = output.satoshis || 0;
+      let memoScriptHex = Tx._createMemoScript(output.memo, sats, i);
       let txOut = memoScriptHex.join(_sep);
 
       tx.push(txOut);
@@ -1320,11 +1319,12 @@ var DashTx = ("object" === typeof module && exports) || {};
 
   /**
    * @param {String} memoHex - the memo bytes, in hex
+   * @param {Uint53} sats - typically 0, but 1.0 for proposal collateral
    * @returns {Array<String>} - memo script hex
    */
-  Tx._createMemoScript = function (memoHex, i = 0) {
+  Tx._createMemoScript = function (memoHex, sats, i = 0) {
     let outputHex = [];
-    let satoshis = TxUtils._toUint64LE(0);
+    let satoshis = TxUtils._toUint64LE(sats);
     outputHex.push(satoshis);
 
     assertHex(memoHex, `output[${i}].memo`);
