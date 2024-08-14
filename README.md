@@ -491,8 +491,8 @@ Tx.createLegacyTx(coins, outputs, changeOutput);
    *   - `txDraft.change.address` MUST be set before signing the transaction
    *
    *  BIP-69 Secure Sorting must be done AFTER setting each `address`
-   *   - `Tx.sortInputs(txDraft.inputs)`
-   *   - `Tx.sortOutputs(txDraft.outputs)`
+   *   - `txDraft.inputs.sort(Tx.sortInputs)`
+   *   - `txDraft.outputs.sort(Tx.sortOutputs)`
    */
   let txDraft = tx.legacy.draftSingleOutput({ utxos, inputs, output });
 
