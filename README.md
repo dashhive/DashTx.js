@@ -182,6 +182,10 @@ let keyUtils = {
 
     return pubKeyBytes;
   },
+
+  pubkeyToPkh: DashKeys.pubkeyToPkh,
+
+  addrToPkh: DashKeys.addrToPkh,
 };
 ```
 
