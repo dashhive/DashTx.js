@@ -152,12 +152,13 @@ toPublicKey(privKeyBytes)
 ```js
 let keyUtils = {
   getPrivateKey: async function (txInput, i) {
+    let opts = { version: "mainnet" };
     let pkhBytes = DashKeys.utils.hexToBytes(txInput.pubKeyHash);
-    let address = await DashKeys.pkhToAddr(txInput.pubKeyHash);
+    let address = await DashKeys.pkhToAddr(pkhBytes, opts);
 
     let yourKeyData = yourWalletKeyMapGoesHere[address];
 
-    let privKeyBytes = DashKeys.wifToPrivKey(yourKeyData.wif);
+    let privKeyBytes = await DashKeys.wifToPrivKey(yourKeyData.wif, opts);
     return privKeyBytes;
   },
 
