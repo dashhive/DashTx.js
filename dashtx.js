@@ -869,8 +869,8 @@ var DashTx = ("object" === typeof module && exports) || {};
 
     // memo vs non-memo is settled by 'satoshis' being 0
     // (otherwise there's a bug)
-    if (a.memo) {
-      if (!b.memo) {
+    if (typeof a.memo === "string") {
+      if (typeof b.memo !== "string") {
         throw new Error(`'satoshis' must be above 0, except for memos`);
       }
       if (a.memo < b.memo) {
@@ -1268,7 +1268,7 @@ var DashTx = ("object" === typeof module && exports) || {};
         output.memo = TxUtils.strToHex(output.message);
       }
     }
-    if (output.memo) {
+    if (typeof output.memo === "string") {
       let invalid = output.address || output.pubKeyHash;
       if (invalid) {
         throw new Error(`memo outputs must not have 'address' or 'pubKeyHash'`);
@@ -1306,7 +1306,7 @@ var DashTx = ("object" === typeof module && exports) || {};
   Tx.createDonationOutput = function (opts) {
     let satoshis = 0;
     let message = opts?.message;
-    if (!message) {
+    if (typeof message !== "string") {
       let gifts = ["💸", "🎁", "🧧"];
       let indexIsh = Math.random() * 3;
       let index = Math.floor(indexIsh);
@@ -1606,8 +1606,10 @@ var DashTx = ("object" === typeof module && exports) || {};
       output.scriptTypeHex = output.script.slice(0, 2);
       output.scriptType = parseInt(output.scriptTypeHex, 16);
       output.pubKeyHash = "";
-      output.memo = "";
-      output.message = "";
+      /**@type {String?}*/
+      output.memo = null;
+      /**@type {String?}*/
+      output.message = null;
       if (output.scriptTypeHex === OP_RETURN) {
         output.memo = output.script.slice(4, 2 * output.lockScriptSize);
         output.message = "";
@@ -2052,8 +2054,8 @@ if ("object" === typeof module) {
 
 /**
  * @typedef TxOutput
- * @prop {String} [memo] - hex bytes of a memo (incompatible with pubKeyHash / address)
- * @prop {String} [message] - memo, but as a UTF-8 string
+ * @prop {String?} [memo] - hex bytes of a memo (incompatible with pubKeyHash / address)
+ * @prop {String?} [message] - memo, but as a UTF-8 string
  * @prop {String} [address] - payAddr as Base58Check (human-friendly)
  * @prop {String} [pubKeyHash] - payAddr's raw hex value (decoded, not Base58Check)
  * @prop {Uint53} satoshis - the number of smallest units of the currency
@@ -2063,7 +2065,7 @@ if ("object" === typeof module) {
  * @typedef TxOutputSortable
  * @prop {Uint53} satoshis
  * @prop {String} [script] - hex bytes in wire order
- * @prop {String} [memo] - 0x6a, hex bytes
+ * @prop {String?} [memo] - 0x6a, hex bytes
  * @prop {String} [pubKeyHash] - 0x76, 0xa9, hex bytes
  * @prop {String} [address] - 0x76, 0xa9, base58check bytes
  */
@@ -2105,7 +2107,7 @@ if ("object" === typeof module) {
  * Create a donation output with a nice message.
  * @callback TxCreateDonationOutput
  * @param {Object} [opts]
- * @param {String} [opts.message] - UTF-8 Memo String
+ * @param {String?} [opts.message] - UTF-8 Memo String
  */
 
 /**
