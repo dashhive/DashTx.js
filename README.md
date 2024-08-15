@@ -396,6 +396,9 @@ Tx.appraise({ inputs, outputs });
 
 Tx.parseUnknown(serializedHex);
 
+// RPC, for 'sendrawtransaction' broadcast
+Tx.utils.rpc(basicAuthUrl, method, arg1, arg2, ...);
+
 // Byte-level helpers
 Tx.utils.toVarInt(n);
 Tx.utils.toVarIntSize(n);
@@ -571,6 +574,19 @@ Tx.doubleSha256(txBytes);
  * ready-to-broadcast transaction with signed inputs.
  */
 Tx.parseUnknown(serializedHex);
+```
+
+### RPC Helper
+
+```js
+/**
+ * Make RPC calls to a web service, masternode, or full node
+ *
+ * ex:
+ *   - https://api:token@rpc.digitalcash.dev/
+ *   - http://user:pass@localhost:19998/wallet/foo
+ */
+Tx.utils.rpc(basicAuthUrl, method, arg1, arg2, ...);
 ```
 
 ### Utility Functions

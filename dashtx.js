@@ -1692,6 +1692,40 @@ var DashTx = ("object" === typeof module && exports) || {};
   }
 
   /**
+   * @param {String} basicAuthUrl - ex: https://api:token@trpc.digitalcash.dev/
+   *                                    http://user:pass@localhost:19998/
+   * @param {String} method - the rpc, such as 'getblockchaininfo',
+   *                          'getaddressdeltas', or 'help'
+   * @param {...any} params - the arguments for the specific rpc
+   *                          ex: rpc(url, 'help', 'getaddressdeltas')
+   */
+  TxUtils.rpc = async function rpc(basicAuthUrl, method, ...params) {
+    let url = new URL(basicAuthUrl);
+    let baseUrl = `${url.protocol}//${url.host}${url.pathname}`;
+    let basicAuth = btoa(`${url.username}:${url.password}`);
+
+    // typically http://localhost:19998/
+    let payload = JSON.stringify({ method, params });
+    let resp = await fetch(baseUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${basicAuth}`,
+        "Content-Type": "application/json",
+      },
+      body: payload,
+    });
+
+    let data = await resp.json();
+    if (data.error) {
+      let err = new Error(data.error.message);
+      Object.assign(err, data.error);
+      throw err;
+    }
+
+    return data.result;
+  };
+
+  /**
    * @param {String} hex
    */
   TxUtils.hexToBytes = function (hex) {
