@@ -687,7 +687,7 @@ var DashTx = ("object" === typeof module && exports) || {};
    * or the largest available coins until that total is met.
    */
   //@ts-ignore - TODO update typedefs
-  Tx.createLegacyTx = async function (coins, outputs, changeOutput) {
+  Tx.createLegacyTx = function (coins, outputs, changeOutput) {
     // TODO bump to 4 for DIP: enforce tx hygiene
     let version = CURRENT_VERSION;
 
