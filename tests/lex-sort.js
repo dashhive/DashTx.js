@@ -179,12 +179,7 @@ Zora.test("legacyCreateTx uses lex sort functions", async function (t) {
 
   let changeOutput = {};
 
-  await DashTx.legacyCreateTx(inputs, outputs, changeOutput)
-    .then(function (txInfo) {
-      t.deepEqual(sortedIn, txInfo.inputs, "inputs should be sorted");
-      t.deepEqual(sortedOut, txInfo.outputs, "outputs should be sorted");
-    })
-    .catch(function (e) {
-      t.ok(false, e.message);
-    });
+  let txInfo = DashTx.legacyCreateTx(inputs, outputs, changeOutput);
+  t.deepEqual(sortedIn, txInfo.inputs, "inputs should be sorted");
+  t.deepEqual(sortedOut, txInfo.outputs, "outputs should be sorted");
 });
