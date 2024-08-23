@@ -97,27 +97,32 @@ async function main() {
   console.info(`Fee:                ${feeDash} (${feeDuffs})`);
   //change.satoshis = sats;
 
-  let dashTx = DashTx.create({
-    /** @type {import('../dashtx.js').TxSign} */
+  /** @type {import('../dashtx.js').TxKeyUtils} */
+  let keyUtils = {
     sign: async function (privKeyBytes, hashBytes) {
       let sigOpts = { canonical: true };
       let sigBuf = await Secp256k1.sign(hashBytes, privKeyBytes, sigOpts);
       return sigBuf;
     },
+  getPublicKey: async function (txInput, i) {
+    let privKeyBytes = await keyUtils.getPrivateKey(txInput, i);
+    if (!privKeyBytes) {
+      return null;
+    }
+    let pubKeyBytes = await keyUtils.toPublicKey(privKeyBytes);
+
+    return pubKeyBytes;
+  },
     getPrivateKey: async function () {
       return privKeyBytes;
     },
-    toPublicKey:
-      /**
-       * @param {Uint8Array} privBytes
-       * @returns {Promise<Uint8Array>}
-       */
-      async function (privBytes) {
-        let isCompressed = true;
-        let pubBytes = Secp256k1.getPublicKey(privBytes, isCompressed);
-        return pubBytes;
-      },
-  });
+    toPublicKey: async function (privBytes) {
+      let isCompressed = true;
+      let pubBytes = Secp256k1.getPublicKey(privBytes, isCompressed);
+      return pubBytes;
+    },
+  };
+  let dashTx = DashTx.create(keyUtils);
 
   //@ts-ignore
   let txInfoSigned = await dashTx.hashAndSignAll(txInfo);

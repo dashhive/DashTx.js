@@ -67,7 +67,7 @@
 
 /**
  * @callback TxCreate
- * @param {TxDeps} keyUtils
+ * @param {TxKeyUtils} keyUtils
  * @returns {tx}
  */
 
@@ -273,6 +273,9 @@ var DashTx = ("object" === typeof module && exports) || {};
         return pubKeyBytes;
       };
     }
+    /** @type {TxDeps} */
+    //@ts-ignore
+    let keyDeps = keyUtils;
 
     let txInst = {};
 
@@ -314,7 +317,7 @@ var DashTx = ("object" === typeof module && exports) || {};
 
       for (let i = 0; i < txInfo.inputs.length; i += 1) {
         let txInput = txInfo.inputs[i];
-        let privBytes = await keyUtils.getPrivateKey(txInput, i, txInfo.inputs);
+        let privBytes = await keyDeps.getPrivateKey(txInput, i, txInfo.inputs);
         if (privBytes) {
           txInput = await txInst.hashAndSignInput(
             privBytes,
@@ -359,7 +362,7 @@ var DashTx = ("object" === typeof module && exports) || {};
       let txBytes = Tx.utils.hexToBytes(txHex);
       let txHashBuf = await Tx.doubleSha256(txBytes);
 
-      let sigBuf = await keyUtils.sign(privBytes, txHashBuf);
+      let sigBuf = await keyDeps.sign(privBytes, txHashBuf);
       let sigHex = "";
       if ("string" === typeof sigBuf) {
         console.warn(`sign() should return a Uint8Array of an ASN.1 signature`);
@@ -370,7 +373,10 @@ var DashTx = ("object" === typeof module && exports) || {};
 
       let pubKeyHex = txInput.publicKey;
       if (!pubKeyHex) {
-        let pubKey = await keyUtils.getPublicKey(txInput, i, txInfo.inputs);
+        let pubKey = await keyDeps.getPublicKey(txInput, i, txInfo.inputs);
+        if (!pubKey) {
+          throw new Error(`no public key for input ${i}`);
+        }
         pubKeyHex = Tx.utils.bytesToHex(pubKey);
       }
       if ("string" !== typeof pubKeyHex) {
@@ -1930,12 +1936,13 @@ if ("object" === typeof module) {
  */
 
 /**
- * @typedef TxDeps
+ * @typedef TxKeyUtils
  * @prop {TxGetPrivateKey} getPrivateKey
- * @prop {TxGetPublicKey} getPublicKey - efficiently get public key bytes
- * @prop {TxToPublicKey} [toPublicKey] - convert private bytes to pub bytes
+ * @prop {TxGetPublicKey} [getPublicKey] - efficiently get public key bytes
+ * @prop {TxToPublicKey} toPublicKey - convert private bytes to pub bytes
  * @prop {TxSign} sign
  */
+/** @typedef {Required<TxKeyUtils>} TxDeps */
 
 /**
  * @typedef TxFees
@@ -2151,17 +2158,17 @@ if ("object" === typeof module) {
 /**
  * @callback TxGetPrivateKey
  * @param {TxInputForSig} txInput
- * @param {Uint53} i
- * @param {Array<TxInputRaw|TxInputForSig>} txInputs
- * @returns {Promise<TxPrivateKey>} - private key Uint8Array
+ * @param {Uint53} [i]
+ * @param {Array<TxInputRaw|TxInputForSig>} [txInputs]
+ * @returns {Promise<TxPrivateKey?>} - private key Uint8Array
  */
 
 /**
  * @callback TxGetPublicKey
  * @param {TxInputForSig} txInput
- * @param {Uint53} i
- * @param {Array<TxInputRaw|TxInputForSig>} txInputs
- * @returns {Promise<TxPublicKey>} - public key Uint8Array
+ * @param {Uint53} [i]
+ * @param {Array<TxInputRaw|TxInputForSig>} [txInputs]
+ * @returns {Promise<TxPublicKey?>} - public key Uint8Array
  */
 
 /**
