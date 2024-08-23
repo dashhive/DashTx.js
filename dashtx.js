@@ -56,6 +56,7 @@
 
 /**
  * @typedef TxUtils
+ * @prop {TxRPC} rpc
  * @prop {TxToVarInt} toVarInt
  * @prop {TxToVarIntSize} toVarIntSize
  * @prop {TxReverseHex} reverseHex
@@ -1693,14 +1694,7 @@ var DashTx = ("object" === typeof module && exports) || {};
     }
   }
 
-  /**
-   * @param {String} basicAuthUrl - ex: https://api:token@trpc.digitalcash.dev/
-   *                                    http://user:pass@localhost:19998/
-   * @param {String} method - the rpc, such as 'getblockchaininfo',
-   *                          'getaddressdeltas', or 'help'
-   * @param {...any} params - the arguments for the specific rpc
-   *                          ex: rpc(url, 'help', 'getaddressdeltas')
-   */
+  /** @type {TxRPC} */
   TxUtils.rpc = async function rpc(basicAuthUrl, method, ...params) {
     let url = new URL(basicAuthUrl);
     let baseUrl = `${url.protocol}//${url.host}${url.pathname}`;
@@ -2354,6 +2348,16 @@ if ("object" === typeof module) {
  * @callback TxToPublicKey
  * @param {TxPrivateKey} privateKey - buf
  * @returns {Promise<TxPublicKey>} - public key buf
+ */
+
+/**
+ * @callback TxRPC
+ * @param {String} basicAuthUrl - ex: https://api:token@trpc.digitalcash.dev/
+ *                                    http://user:pass@localhost:19998/
+ * @param {String} method - the rpc, such as 'getblockchaininfo',
+ *                          'getaddressdeltas', or 'help'
+ * @param {...any} params - the arguments for the specific rpc
+ *                          ex: rpc(url, 'help', 'getaddressdeltas')
  */
 
 /**
