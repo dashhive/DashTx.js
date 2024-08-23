@@ -63,6 +63,8 @@
  * @prop {TxHexToBytes} hexToBytes
  * @prop {TxBytesToHex} bytesToHex
  * @prop {TxStringToHex} strToHex
+ * @prop {TxToUint32LE} toUint32LE
+ * @prop {TxToUint64LE} toUint64LE
  */
 
 /**
@@ -1160,7 +1162,7 @@ var DashTx = ("object" === typeof module && exports) || {};
     void Tx.serializeInputs(inputs, { _tx: tx, _sep: _sep });
     void Tx.serializeOutputs(outputs, { _tx: tx, _sep: _sep });
 
-    let locktimeHex = TxUtils._toUint32LE(locktime);
+    let locktimeHex = TxUtils.toUint32LE(locktime);
     tx.push(locktimeHex);
 
     if (extraPayload) {
@@ -1170,7 +1172,7 @@ var DashTx = ("object" === typeof module && exports) || {};
     }
 
     if (sigHashType) {
-      let sigHashTypeHex = TxUtils._toUint32LE(sigHashType);
+      let sigHashTypeHex = TxUtils.toUint32LE(sigHashType);
       tx.push(sigHashTypeHex);
     }
 
@@ -1221,7 +1223,7 @@ var DashTx = ("object" === typeof module && exports) || {};
         `expected utxo property 'input[${i}]outputIndex' to be an integer representing this input's previous output index`,
       );
     }
-    let reverseVout = TxUtils._toUint32LE(voutIndex);
+    let reverseVout = TxUtils.toUint32LE(voutIndex);
     tx.push(reverseVout);
 
     //@ts-ignore - enum types not handled properly here
@@ -1309,7 +1311,7 @@ var DashTx = ("object" === typeof module && exports) || {};
     if (!output.satoshis) {
       throw new Error(`every output must have 'satoshis'`);
     }
-    let satoshis = TxUtils._toUint64LE(output.satoshis);
+    let satoshis = TxUtils.toUint64LE(output.satoshis);
     tx.push(satoshis);
 
     if (!output.pubKeyHash) {
@@ -1348,7 +1350,7 @@ var DashTx = ("object" === typeof module && exports) || {};
    */
   Tx._createMemoScript = function (memoHex, sats, i = 0) {
     let outputHex = [];
-    let satoshis = TxUtils._toUint64LE(sats);
+    let satoshis = TxUtils.toUint64LE(sats);
     outputHex.push(satoshis);
 
     assertHex(memoHex, `output[${i}].memo`);
@@ -1816,17 +1818,17 @@ var DashTx = ("object" === typeof module && exports) || {};
 
     //@ts-ignore
     if (n <= MAX_U16) {
-      return "fd" + TxUtils._toUint32LE(n).slice(0, 4);
+      return "fd" + TxUtils.toUint32LE(n).slice(0, 4);
     }
 
     //@ts-ignore
     if (n <= MAX_U32) {
-      return "fe" + TxUtils._toUint32LE(n);
+      return "fe" + TxUtils.toUint32LE(n);
     }
 
     //@ts-ignore
     if (n <= MAX_U53) {
-      return "ff" + TxUtils._toUint64LE(n);
+      return "ff" + TxUtils.toUint64LE(n);
     }
 
     if ("bigint" !== typeof n) {
@@ -1836,7 +1838,7 @@ var DashTx = ("object" === typeof module && exports) || {};
     }
 
     if (n <= MAX_U64) {
-      return "ff" + TxUtils._toUint64LE(n);
+      return "ff" + TxUtils.toUint64LE(n);
     }
 
     let err = new Error(E_TOO_BIG_INT);
@@ -1850,7 +1852,7 @@ var DashTx = ("object" === typeof module && exports) || {};
    * @param {BigInt|Number} n - 16-bit positive int to encode
    */
   TxUtils._toUint16LE = function (n) {
-    let hexLE = TxUtils._toUint32LE(n);
+    let hexLE = TxUtils.toUint32LE(n);
     // ex: 03000800 => 0300
     hexLE = hexLE.slice(0, 4);
     return hexLE;
@@ -1861,7 +1863,7 @@ var DashTx = ("object" === typeof module && exports) || {};
    * which is true in practice, and much simpler.
    * @param {BigInt|Number} n - 32-bit positive int to encode
    */
-  TxUtils._toUint32LE = function (n) {
+  TxUtils.toUint32LE = function (n) {
     // make sure n is uint32/int53, not int32
     //n = n >>> 0;
 
@@ -1871,6 +1873,13 @@ var DashTx = ("object" === typeof module && exports) || {};
     let hexLE = Tx.utils.reverseHex(hex);
     return hexLE;
   };
+  //@ts-ignore
+  TxUtils._toUint32LE = function (n) {
+    console.warn(
+      "warn: use public TxUtils.toUint32LE() instead of internal TxUtils._toUint32LE()",
+    );
+    return TxUtils.toUint32LE(n);
+  };
 
   /**
    * This can handle Big-Endian CPUs, which don't exist,
@@ -1878,7 +1887,7 @@ var DashTx = ("object" === typeof module && exports) || {};
    * @param {BigInt|Number} n - 64-bit BigInt or <= 53-bit Number to encode
    * @returns {String} - 8 Little-Endian bytes
    */
-  TxUtils._toUint64LE = function (n) {
+  TxUtils.toUint64LE = function (n) {
     let bn;
     if ("bigint" === typeof n) {
       bn = n;
@@ -1902,6 +1911,13 @@ var DashTx = ("object" === typeof module && exports) || {};
     let hex = hexArr.join("");
 
     return hex;
+  };
+  //@ts-ignore
+  TxUtils._toUint64LE = function (n) {
+    console.warn(
+      "warn: use public TxUtils.toUint64LE() instead of internal TxUtils._toUint64LE()",
+    );
+    return TxUtils.toUint64LE(n);
   };
 
   /** @type TxToVarIntSize */
@@ -2455,4 +2471,16 @@ if ("object" === typeof module) {
  * @callback TxStringToHex
  * @param {String} utf8
  * @returns {String} - encoded bytes as hex
+ */
+
+/**
+ * @callback TxToUint32LE
+ * @param {Uint32} n
+ * @returns {Hex}
+ */
+
+/**
+ * @callback TxToUint64LE
+ * @param {Uint32} n
+ * @returns {Hex}
  */
