@@ -24,6 +24,7 @@
  * @prop {TxCreateInputRaw} createInputRaw
  * @prop {TxCreateForSig} createForSig
  * @prop {TxCreateInputForSig} createInputForSig
+ * @prop {TxCreatePkhScript} createPkhScript
  * @prop {TxCreateSigned} createSigned
  * @prop {TxGetId} getId - only useful for fully signed tx
  * @prop {TxCreateLegacyTx} createLegacyTx
@@ -1122,7 +1123,7 @@ var DashTx = ("object" === typeof module && exports) || {};
           `signable input must have either 'pubKeyHash' or 'script'`,
         );
       }
-      lockScript = `${OP_DUP}${OP_HASH160}${PKH_SIZE}${input.pubKeyHash}${OP_EQUALVERIFY}${OP_CHECKSIG}`;
+      lockScript = Tx.createPkhScript(input.pubKeyHash);
     }
     return {
       txId: input.txId || input.txid,
@@ -1132,6 +1133,15 @@ var DashTx = ("object" === typeof module && exports) || {};
       sigHashType: input.sigHashType,
       script: lockScript,
     };
+  };
+
+  /**
+   * @param {Hex} pubKeyHash
+   * @returns {Hex}
+   */
+  Tx.createPkhScript = function (pubKeyHash) {
+    let lockScript = `${OP_DUP}${OP_HASH160}${PKH_SIZE}${pubKeyHash}${OP_EQUALVERIFY}${OP_CHECKSIG}`;
+    return lockScript;
   };
 
   Tx.serialize = function (
@@ -2193,6 +2203,12 @@ if ("object" === typeof module) {
  * @callback TxCreateInputForSig
  * @param {TxInputForSig} input
  * @param {Uint32} inputIndex - create hashable tx for this input
+ */
+
+/**
+ * @callback TxCreatePkhScript
+ * @param {Hex} pubKeyHash
+ * @returns {Hex} - ${OP_DUP}${OP_HASH160}${PKH_SIZE}${pubKeyHash}${OP_EQUALVERIFY}${OP_CHECKSIG}
  */
 
 /**
