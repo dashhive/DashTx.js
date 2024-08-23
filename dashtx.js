@@ -89,6 +89,7 @@ var DashTx = ("object" === typeof module && exports) || {};
   let TxUtils = {};
 
   const CURRENT_VERSION = 3;
+  const TYPE_VERSION = 0;
   const SATOSHIS = 100000000;
 
   const MAX_U8 = Math.pow(2, 8) - 1;
@@ -143,11 +144,13 @@ var DashTx = ("object" === typeof module && exports) || {};
   Tx.LEGACY_DUST = 2000;
 
   Tx._HEADER_ONLY_SIZE =
-    4 + // version
+    2 + // version
+    2 + // type
     4; // locktime
 
   Tx.HEADER_SIZE =
-    4 + // version
+    2 + // version
+    2 + // type
     1 + // input count
     1 + // output count
     4; // locktime
@@ -307,11 +310,13 @@ var DashTx = ("object" === typeof module && exports) || {};
 
       /** @type {TxInfoSigned} */
       let txInfoSigned = {
+        version: txInfo.version || CURRENT_VERSION,
+        type: txInfo.type || TYPE_VERSION,
         /** @type {Array<TxInputSigned>} */
         inputs: [],
         outputs: txInfo.outputs,
-        version: txInfo.version || CURRENT_VERSION,
         locktime: txInfo.locktime || 0x00,
+        extraPayload: txInfo.extraPayload || "",
         transaction: "",
       };
 
@@ -694,9 +699,10 @@ var DashTx = ("object" === typeof module && exports) || {};
    * or the largest available coins until that total is met.
    */
   //@ts-ignore - TODO update typedefs
-  Tx.createLegacyTx = function (coins, outputs, changeOutput) {
+  Tx.createLegacyTx = function (coins, outputs, changeOutput, extraPayload) {
     // TODO bump to 4 for DIP: enforce tx hygiene
     let version = CURRENT_VERSION;
+    let type = TYPE_VERSION;
 
     coins = coins.slice(0);
     outputs = outputs.slice(0);
@@ -780,10 +786,12 @@ var DashTx = ("object" === typeof module && exports) || {};
 
     let txInfo = {
       version,
+      type,
       inputs,
       outputs,
       changeIndex,
       locktime,
+      extraPayload,
     };
     // let change = txInfo.outputs[txInfo.changeIndex];
 
@@ -1127,9 +1135,11 @@ var DashTx = ("object" === typeof module && exports) || {};
   Tx.serialize = function (
     {
       version = CURRENT_VERSION,
+      type = TYPE_VERSION,
       inputs,
-      locktime = 0x0,
       outputs,
+      locktime = 0x0,
+      extraPayload = "",
       /* maxFee = 10000, */
       _debug = false,
     },
@@ -1142,8 +1152,10 @@ var DashTx = ("object" === typeof module && exports) || {};
 
     /** @type Array<String> */
     let tx = [];
-    let v = TxUtils._toUint32LE(version);
+    let v = TxUtils._toUint16LE(version);
     tx.push(v);
+    let t = TxUtils._toUint16LE(type);
+    tx.push(t);
 
     void Tx.serializeInputs(inputs, { _tx: tx, _sep: _sep });
     void Tx.serializeOutputs(outputs, { _tx: tx, _sep: _sep });
@@ -1151,13 +1163,18 @@ var DashTx = ("object" === typeof module && exports) || {};
     let locktimeHex = TxUtils._toUint32LE(locktime);
     tx.push(locktimeHex);
 
-    let txHex = tx.join(_sep);
+    if (extraPayload) {
+      let nExtraPayload = Tx.utils.toVarInt(extraPayload.length / 2);
+      tx.push(nExtraPayload);
+      tx.push(extraPayload);
+    }
 
     if (sigHashType) {
       let sigHashTypeHex = TxUtils._toUint32LE(sigHashType);
-      txHex = `${txHex}${sigHashTypeHex}`;
+      tx.push(sigHashTypeHex);
     }
 
+    let txHex = tx.join(_sep);
     return txHex;
   };
   //@ts-ignore - same function, but typed and documented separately for clarity
@@ -1466,10 +1483,15 @@ var DashTx = ("object" === typeof module && exports) || {};
 
     tx.offset = 0;
 
-    tx.versionHex = hex.substr(tx.offset, 8);
+    tx.versionHex = hex.substr(tx.offset, 4);
     let versionHexRev = Tx.utils.reverseHex(tx.versionHex);
     tx.version = parseInt(versionHexRev, 16);
-    tx.offset += 8;
+    tx.offset += 4;
+
+    tx.typeHex = hex.substr(tx.offset, 4);
+    let typeHexRev = Tx.utils.reverseHex(tx.typeHex);
+    tx.type = parseInt(typeHexRev, 16);
+    tx.offset += 4;
 
     let [numInputs, numInputsSize] = TxUtils._parseVarIntHex(hex, tx.offset);
     tx.offset += numInputsSize;
@@ -1638,10 +1660,26 @@ var DashTx = ("object" === typeof module && exports) || {};
     tx.locktime = parseInt(locktimeHexRev, 16);
     tx.offset += 8;
 
+    tx.extraPayloadSizeHex = "";
+    /** @type {Uint8?} */
+    tx.extraPayloadSize = null;
+    tx.extraPayloadHex = "";
+    if (tx.type > 0) {
+      // TODO varint
+      tx.extraPayloadSizeHex = hex.substr(tx.offset, 2);
+      tx.extraPayloadSize = parseInt(tx.extraPayloadSizeHex, 16);
+      tx.offset += 2;
+
+      tx.extraPayloadHex = hex.substr(tx.offset, 2 * tx.extraPayloadSize);
+      tx.offset += 2 * tx.extraPayloadSize;
+    }
+
     tx.sigHashTypeHex = hex.substr(tx.offset);
     if (tx.sigHashTypeHex) {
-      tx.sigHashType = parseInt(tx.sigHashTypeHex.slice(0, 2));
-      hex = hex.slice(0, -8);
+      let firstLEIntByte = tx.sigHashTypeHex.slice(0, 2);
+      tx.sigHashType = parseInt(firstLEIntByte);
+      let fullLEIntHexSize = 8;
+      hex = hex.slice(0, -fullLEIntHexSize); // but the size is actually 4 bytes
     }
 
     tx.size = hex.length / 2;
@@ -1809,6 +1847,18 @@ var DashTx = ("object" === typeof module && exports) || {};
   /**
    * Just assumes that all target CPUs are Little-Endian,
    * which is true in practice, and much simpler.
+   * @param {BigInt|Number} n - 16-bit positive int to encode
+   */
+  TxUtils._toUint16LE = function (n) {
+    let hexLE = TxUtils._toUint32LE(n);
+    // ex: 03000800 => 0300
+    hexLE = hexLE.slice(0, 4);
+    return hexLE;
+  };
+
+  /**
+   * Just assumes that all target CPUs are Little-Endian,
+   * which is true in practice, and much simpler.
    * @param {BigInt|Number} n - 32-bit positive int to encode
    */
   TxUtils._toUint32LE = function (n) {
@@ -1916,6 +1966,7 @@ if ("object" === typeof module) {
 
 /** @typedef {Number} Float64 */
 /** @typedef {Number} Uint8 */
+/** @typedef {Number} Uint16 */
 /** @typedef {Number} Uint32 */
 /** @typedef {Number} Uint53 */
 /** @typedef {String} Hex */
@@ -1953,11 +2004,13 @@ if ("object" === typeof module) {
 
 /**
  * @typedef TxInfo
+ * @prop {Uint16} [version]
+ * @prop {Uint16} [type]
  * @prop {Array<TxInputForSig>} inputs
- * @prop {Uint32} [locktime] - 0 by default
  * @prop {Array<TxOutput>} outputs
- * @prop {Uint32} [version]
- * @prop {String} [transaction] - signed transaction hex
+ * @prop {Uint32} [locktime] - 0 by default
+ * @prop {Hex} [extraPayload] - extra payload bytes
+ * @prop {Hex} [transaction] - signed transaction hex
  * @prop {Boolean} [_debug] - bespoke debug output
  */
 
@@ -1971,10 +2024,12 @@ if ("object" === typeof module) {
 
 /**
  * @typedef TxInfoSigned
+ * @prop {Uint16} version
+ * @prop {Uint16} type
  * @prop {Array<TxInputSigned>} inputs
- * @prop {Uint32} locktime - 0 by default
  * @prop {Array<TxOutput>} outputs
- * @prop {Uint32} version
+ * @prop {Uint32} locktime - 0 by default
+ * @prop {Hex} extraPayload - extra payload bytes
  * @prop {String} transaction - signed transaction hex
  * @prop {Boolean} [_debug] - bespoke debug output
  */
@@ -2127,9 +2182,12 @@ if ("object" === typeof module) {
 /**
  * @callback TxCreateRaw
  * @param {Object} opts
+ * @param {Uint16} [opts.version]
+ * @param {Uint16} [opts.type]
  * @param {Array<TxInputRaw>} opts.inputs
  * @param {Array<TxOutput>} opts.outputs
- * @param {Uint32} [opts.version]
+ * @param {Uint32} [opts.locktime]
+ * @param {Hex} [opts.extraPayload]
  * @param {Boolean} [opts._debug] - bespoke debug output
  */
 
@@ -2142,9 +2200,12 @@ if ("object" === typeof module) {
 /**
  * @callback TxCreateSigned
  * @param {Object} opts
+ * @param {Uint16} [opts.version]
+ * @param {Uint16} [opts.type]
  * @param {Array<TxInputSigned>} opts.inputs
  * @param {Array<TxOutput>} opts.outputs
- * @param {Uint32} [opts.version]
+ * @param {Uint32} [opts.locktime]
+ * @param {Hex} [opts.extraPayload]
  * @param {Boolean} [opts._debug] - bespoke debug output
  * xparam {String} [opts.sigHashType] - hex, typically 01 (ALL)
  */
@@ -2252,10 +2313,12 @@ if ("object" === typeof module) {
 /**
  * @callback TxSerialize
  * @param {Object} txInfo
+ * @param {Uint16} [txInfo.version]
+ * @param {Uint16} [txInfo.type]
  * @param {Array<TxInputRaw|TxInputForSig|TxInputSigned>} txInfo.inputs
- * @param {Uint32} [txInfo.locktime]
  * @param {Array<TxOutput>} txInfo.outputs
- * @param {Uint32} [txInfo.version]
+ * @param {Uint32} [txInfo.locktime]
+ * @param {Hex?} [txInfo.extraPayload] - extra payload
  * @param {Boolean} [txInfo._debug] - bespoke debug output
  * @param {Uint32} [sigHashType]
  */
@@ -2263,10 +2326,12 @@ if ("object" === typeof module) {
 /**
  * @callback TxSerializeForSig
  * @param {Object} txInfo
+ * @param {Uint16} [txInfo.version]
+ * @param {Uint16} [txInfo.type]
  * @param {Array<TxInputRaw|TxInputForSig>} txInfo.inputs
  * @param {Uint32} [txInfo.locktime]
  * @param {Array<TxOutput>} txInfo.outputs
- * @param {Uint32} [txInfo.version]
+ * @param {Hex?} [txInfo.extraPayload] - extra payload
  * @param {Boolean} [txInfo._debug] - bespoke debug output
  * @param {Uint32} sigHashType
  */

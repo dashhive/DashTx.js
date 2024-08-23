@@ -11,11 +11,17 @@ async function test() {
     let filename = "dsf.tx-request.hex";
     let txInfo = await parseHexFile(filename);
 
-    if (txInfo.versionHex !== "02000000") {
-      throw new Error(`${filename} versionHex is not 02000000`);
+    if (txInfo.versionHex !== "0200") {
+      throw new Error(`${filename} versionHex is not 0200`);
     }
     if (txInfo.version !== 2) {
       throw new Error(`${filename} version is not 2`);
+    }
+    if (txInfo.typeHex !== "0000") {
+      throw new Error(`${filename} typeHex is not 0000`);
+    }
+    if (txInfo.type !== 0) {
+      throw new Error(`${filename} type is not 0`);
     }
 
     if (txInfo.inputs.length !== 18) {
@@ -36,6 +42,10 @@ async function test() {
       throw new Error(`${filename} locktime is not 0`);
     }
 
+    if (txInfo.extraPayloadHex !== "") {
+      throw new Error(`${filename} extraPayloadHex is not '' (empty string)`);
+    }
+
     if (txInfo.sigHashTypeHex) {
       throw new Error(`${filename} should not have sigHashTypeHex`);
     }
@@ -48,11 +58,17 @@ async function test() {
     let filename = "dss.tx-response.hex";
     let txInfo = await parseHexFile(filename);
 
-    if (txInfo.versionHex !== "02000000") {
-      throw new Error(`${filename} versionHex is not 02000000`);
+    if (txInfo.versionHex !== "0200") {
+      throw new Error(`${filename} versionHex is not 0200`);
     }
     if (txInfo.version !== 2) {
       throw new Error(`${filename} version is not 2`);
+    }
+    if (txInfo.typeHex !== "0000") {
+      throw new Error(`${filename} typeHex is not 0000`);
+    }
+    if (txInfo.type !== 0) {
+      throw new Error(`${filename} type is not 0`);
     }
 
     if (txInfo.inputs.length !== 2) {
@@ -71,6 +87,10 @@ async function test() {
       throw new Error(
         `${filename} locktime is not 2004296226: ${txInfo.locktime}`,
       );
+    }
+
+    if (txInfo.extraPayloadHex !== "") {
+      throw new Error(`${filename} extraPayload is not '' (empty string)`);
     }
   }
 
@@ -107,11 +127,17 @@ async function test() {
     let filename = "sighash-all.tx.hex";
     let txInfo = await parseHexFile(filename);
 
-    if (txInfo.versionHex !== "02000000") {
-      throw new Error(`${filename} versionHex is not 02000000`);
+    if (txInfo.versionHex !== "0200") {
+      throw new Error(`${filename} versionHex is not 0200`);
     }
     if (txInfo.version !== 2) {
       throw new Error(`${filename} version is not 2`);
+    }
+    if (txInfo.typeHex !== "0000") {
+      throw new Error(`${filename} typeHex is not 0000`);
+    }
+    if (txInfo.type !== 0) {
+      throw new Error(`${filename} type is not 0`);
     }
 
     let scriptIndex = -1;
@@ -158,11 +184,17 @@ async function test() {
     let filename = "sighash-any.tx.hex";
     let txInfo = await parseHexFile(filename);
 
-    if (txInfo.versionHex !== "02000000") {
-      throw new Error(`${filename} versionHex is not 02000000`);
+    if (txInfo.versionHex !== "0200") {
+      throw new Error(`${filename} versionHex is not 0200`);
     }
     if (txInfo.version !== 2) {
       throw new Error(`${filename} version is not 2`);
+    }
+    if (txInfo.typeHex !== "0000") {
+      throw new Error(`${filename} typeHex is not 0000`);
+    }
+    if (txInfo.type !== 0) {
+      throw new Error(`${filename} type is not 0`);
     }
 
     let scriptIndex = -1;
