@@ -427,24 +427,37 @@ var DashTx = ("object" === typeof module && exports) || {};
      * @returns {TxDraft}
      */
     txInst.legacy.draftSingleOutput = function ({ utxos, inputs, output }) {
+      let outputs = [output];
+      return txInst.legacy._draft({ utxos, inputs, outputs });
+    };
+
+    /**
+     * @param {Object} opts
+     * @param {Array<CoreUtxo>?} [opts.inputs]
+     * @param {Array<CoreUtxo>?} [opts.utxos]
+     * @param {Array<TxOutput>} opts.outputs
+     * @returns {TxDraft}
+     */
+    txInst.legacy._draft = function ({ utxos, inputs, outputs }) {
       let fullTransfer = false;
+      let sats = DashTx.sum(outputs);
 
       if (!inputs) {
         inputs = DashTx._legacyMustSelectInputs({
-          utxos: utxos,
-          satoshis: output.satoshis,
+          utxos,
+          outputs,
         });
         if (!inputs) {
           // tsc can't tell that 'inputs' was just guaranteed
           throw new Error(`type checker workaround`);
         }
       } else {
-        fullTransfer = !output.satoshis;
+        fullTransfer = !sats;
       }
 
       let totalAvailable = DashTx.sum(inputs);
       //@ts-ignore - TODO update typedefs
-      let fees = DashTx.appraise({ inputs: inputs, outputs: [output] });
+      let fees = DashTx.appraise({ inputs: inputs, outputs: outputs });
 
       //let EXTRA_SIG_BYTES_PER_INPUT = 2;
       let CHANCE_INPUT_SIGS_HAVE_NO_EXTRA_BYTES = 1 / 4;
@@ -463,15 +476,17 @@ var DashTx = ("object" === typeof module && exports) || {};
         feeTarget += likelyPadByteSize;
       }
 
-      let recip = Object.assign({}, output);
-      if (!recip.satoshis) {
-        recip.satoshis = totalAvailable + -feeTarget;
+      if (!sats) {
+        if (outputs.length === 1) {
+          let recip = Object.assign({}, outputs[0]);
+          recip.satoshis = totalAvailable + -feeTarget;
+          outputs = [recip];
+        }
       }
-      let outputs = [recip];
 
       let change;
       let changeSats =
-        totalAvailable + -recip.satoshis + -feeTarget + -DashTx.OUTPUT_SIZE;
+        totalAvailable + -sats + -feeTarget + -DashTx.OUTPUT_SIZE;
       let hasChange = changeSats > DashTx.LEGACY_DUST;
       if (hasChange) {
         change = { address: "", satoshis: changeSats };
@@ -480,7 +495,7 @@ var DashTx = ("object" === typeof module && exports) || {};
       } else {
         change = null;
         // Re: Dash Direct: we round in favor of the network (exact payments)
-        feeTarget = totalAvailable + -recip.satoshis;
+        feeTarget = totalAvailable + -sats;
       }
 
       let txInfoRaw = {
@@ -967,7 +982,7 @@ var DashTx = ("object" === typeof module && exports) || {};
       throw err;
     }
 
-    let selected = Tx._legacySelectOptimalUtxos(utxos, satoshis);
+    let selected = Tx._legacySelectOptimalUtxos(utxos, satoshis, 1);
     if (!selected.length) {
       throw Tx._createInsufficientFundsError(utxos, satoshis);
     }
@@ -979,10 +994,10 @@ var DashTx = ("object" === typeof module && exports) || {};
    * @template {Pick<CoreUtxo, "satoshis">} T
    * @param {Array<T>} utxos
    * @param {Uint53} outputSats
+   * @param {Uint32} [numOutputs]
    * @return {Array<T>}
    */
-  Tx._legacySelectOptimalUtxos = function (utxos, outputSats) {
-    let numOutputs = 1;
+  Tx._legacySelectOptimalUtxos = function (utxos, outputSats, numOutputs = 1) {
     let extraSize = 0;
     let fees = DashTx._appraiseCounts(utxos.length, numOutputs, extraSize);
 
@@ -1409,7 +1424,7 @@ var DashTx = ("object" === typeof module && exports) || {};
   Tx.sum = function (coins) {
     let balance = 0;
     for (let utxo of coins) {
-      let sats = utxo.satoshis;
+      let sats = utxo.satoshis || 0;
       balance += sats;
     }
 
