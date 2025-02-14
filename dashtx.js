@@ -80,6 +80,9 @@
  * @prop {TxHashAndSignInput} hashAndSignInput
  */
 
+// Based on discoveries from
+// https://github.com/jojobyte/browser-import-rabbit-hole
+
 /** @type {Tx} */
 //@ts-ignore
 var DashTx = ("object" === typeof module && exports) || {};
@@ -313,13 +316,13 @@ var DashTx = ("object" === typeof module && exports) || {};
 
       /** @type {TxInfoSigned} */
       let txInfoSigned = {
-        version: txInfo.version || CURRENT_VERSION,
-        type: txInfo.type || TYPE_VERSION,
+        version: txInfo.version ?? CURRENT_VERSION,
+        type: txInfo.type ?? TYPE_VERSION,
         /** @type {Array<TxInputSigned>} */
         inputs: [],
         outputs: txInfo.outputs,
-        locktime: txInfo.locktime || 0x00,
-        extraPayload: txInfo.extraPayload || "",
+        locktime: txInfo.locktime ?? 0x00,
+        extraPayload: txInfo.extraPayload ?? "",
         transaction: "",
       };
 
@@ -578,7 +581,7 @@ var DashTx = ("object" === typeof module && exports) || {};
       let txSigned;
 
       for (let n = 0; true; n += 1) {
-        let changeSats = txDraft.change?.satoshis || 0;
+        let changeSats = txDraft.change?.satoshis ?? 0;
         let hasChange = changeSats > 0;
         let canIncreaseFee = txDraft.fullTransfer || hasChange;
         if (!canIncreaseFee) {
@@ -1194,7 +1197,7 @@ var DashTx = ("object" === typeof module && exports) || {};
 
   Tx.serializeInputs = function (inputs, _opts) {
     let tx = _opts?._tx || [];
-    let _sep = _opts?._sep || "";
+    let _sep = _opts?._sep ?? "";
 
     let nInputs = Tx.utils.toVarInt(inputs.length);
     tx.push(nInputs);
@@ -1276,7 +1279,7 @@ var DashTx = ("object" === typeof module && exports) || {};
 
   Tx.serializeOutputs = function (outputs, opts) {
     let tx = opts?._tx || [];
-    let _sep = opts?._sep || "";
+    let _sep = opts?._sep ?? "";
 
     if (!outputs.length) {
       throw new Error(E_NO_OUTPUTS);
@@ -1297,7 +1300,7 @@ var DashTx = ("object" === typeof module && exports) || {};
 
   Tx.serializeOutput = function (output, i, _opts) {
     let tx = _opts?._tx || [];
-    let _sep = _opts?._sep || "";
+    let _sep = _opts?._sep ?? "";
 
     if (output.message) {
       if (!output.memo) {
@@ -1310,7 +1313,7 @@ var DashTx = ("object" === typeof module && exports) || {};
         throw new Error(`memo outputs must not have 'address' or 'pubKeyHash'`);
       }
 
-      let sats = output.satoshis || 0;
+      let sats = output.satoshis ?? 0;
       let memoScriptHex = Tx._createMemoScript(output.memo, sats, i);
       let txOut = memoScriptHex.join(_sep);
 
