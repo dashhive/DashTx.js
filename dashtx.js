@@ -1271,7 +1271,7 @@ var DashTx = ("object" === typeof module && exports) || {};
       tx.push(rawScript);
     }
 
-    let sequence = "ffffffff";
+    let sequence = input.sequence ?? "ffffffff";
     tx.push(sequence);
 
     return tx;
@@ -2086,6 +2086,7 @@ if ("object" === typeof module) {
  * @prop {String} [script] - the previous lock script (default: derived from public key as p2pkh)
  * @prop {String} publicKey - hex-encoded public key (typically starts with a 0x02 or 0x03 prefix)
  * @prop {String} [pubKeyHash] - the 20-byte pubKeyHash (address without magic byte or checksum)
+ * @prop {String} [sequence] - the 4-byte sequence (typically ffffffff)
  * @prop {Uint32} sigHashType - typically 0x81 (SIGHASH_ALL|SIGHASH_ANYONECANPAY)
  */
 
@@ -2100,6 +2101,7 @@ if ("object" === typeof module) {
  * @prop {String} [script] - the previous lock script (default: derived from public key as p2pkh)
  * @prop {String} [publicKey] - hex-encoded public key (typically starts with a 0x02 or 0x03 prefix)
  * @prop {String} [pubKeyHash] - the 20-byte pubKeyHash (address without magic byte or checksum)
+ * @prop {String} [sequence] - the 4-byte sequence (typically ffffffff)
  * @prop {Uint32} sigHashType - typically 0x81 (SIGHASH_ALL|SIGHASH_ANYONECANPAY)
  */
 
@@ -2110,6 +2112,7 @@ if ("object" === typeof module) {
  * @prop {String} [txId] - deprecated
  * @prop {String} txid - hex (not pre-reversed)
  * @prop {Uint32} outputIndex - index in previous tx's output (vout index)
+ * @prop {String} [sequence] - the 4-byte sequence (typically ffffffff)
  */
 
 /**
@@ -2134,7 +2137,7 @@ if ("object" === typeof module) {
  */
 
 /**
- * @typedef {Pick<TxInput, "txId"|"txid"|"outputIndex"|"signature"|"publicKey"|"sigHashType">} TxInputSigned
+ * @typedef {Pick<TxInput, "txId"|"txid"|"outputIndex"|"signature"|"publicKey"|"sequence"|"sigHashType">} TxInputSigned
  */
 
 /**
@@ -2355,7 +2358,7 @@ if ("object" === typeof module) {
  * @param {Uint32} [txInfo.locktime]
  * @param {Hex?} [txInfo.extraPayload] - extra payload
  * @param {Boolean} [txInfo._debug] - bespoke debug output
- * @param {Uint32} [sigHashType]
+ * @param {Uint32?} [sigHashType]
  */
 
 /**
@@ -2368,7 +2371,7 @@ if ("object" === typeof module) {
  * @param {Array<TxOutput>} txInfo.outputs
  * @param {Hex?} [txInfo.extraPayload] - extra payload
  * @param {Boolean} [txInfo._debug] - bespoke debug output
- * @param {Uint32} sigHashType
+ * @param {Uint32?} sigHashType
  */
 
 /**
